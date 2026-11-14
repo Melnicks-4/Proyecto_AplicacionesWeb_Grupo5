@@ -1,5 +1,6 @@
 {
-  "name": "marea-azul",
+  "name": "angry_fins",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,10 +8,10 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "phaser": "3.90.0"
-  },
   "devDependencies": {
-    "vite": "7.3.8"
+    "vite": "^8.3.8"
+  },
+  "dependencies": {
+    "phaser": "^4.2.1"
   }
 }

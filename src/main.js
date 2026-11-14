@@ -1,19 +1,22 @@
 import Phaser from 'phaser';
-import { Inicio, Menu, Partida, Pausa, Victoria, Derrota } from './scenes.js';
+import GameScene from './scenes/GameScene.js';
+import { Inicio, Menu, Pausa, Victoria, Derrota } from './scenes/FlowScenes.js';
 
-new Phaser.Game({
+const config = {
   type: Phaser.AUTO,
-  parent: 'juego',
-  width: 800,
-  height: 450,
-  backgroundColor: '#082b43',
+  parent: 'game',
+  width: 960,
+  height: 540,
+  backgroundColor: '#87ceeb',
+  physics: {
+    default: 'arcade',
+    arcade: { gravity: { y: 600 }, debug: false }
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  physics: {
-    default: 'arcade',
-    arcade: { gravity: { x: 0, y: 0 } }
-  },
-  scene: [Inicio, Menu, Partida, Pausa, Victoria, Derrota]
-});
+  scene: [Inicio, Menu, GameScene, Pausa, Victoria, Derrota]
+};
+
+new Phaser.Game(config);
