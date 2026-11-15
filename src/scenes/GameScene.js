@@ -89,7 +89,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         // Reciclar burbujas que salen de la pantalla
-        this.bubbles.children.each((bubble) => {
+        this.bubbles.getChildren().forEach((bubble) => {
             if (bubble.active && (bubble.x > 820 || bubble.x < -20)) {
                 bubble.setActive(false).setVisible(false);
             }
