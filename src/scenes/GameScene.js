@@ -10,7 +10,7 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor('#005b82');
 
         // Título visible para confirmar que la escena está corriendo
-        this.add.text(400, 50, 'Angry Fins - Modulo Integrante 2', {
+        this.add.text(400, 50, 'Angry Fins', {
             fontFamily: 'Arial',
             fontSize: '24px',
             color: '#ffffff',
