@@ -2,74 +2,92 @@ import Phaser from 'phaser';
 
 export class GameScene extends Phaser.Scene {
     constructor() {
-        super('GameScene');
+        super('Game'); // la clave 'Game' es la que usa el flujo de escenas de la persona 1
     }
 
+    // Carga de respaldo: solo agrega los sprites si la escena de carga (persona 1)
+    // todavía no los cargó. Si ya existen con ese nombre, Phaser los ignora.
     preload() {
-        this.load.image('fish_blue', 'assets/images/fish_blue.png');
-        this.load.image('bubble_a', 'assets/images/bubble_a.png');
-        this.load.image('bubble_c', 'assets/images/bubble_c.png');
+        const assets = import.meta.env.BASE_URL + 'assets/images/'; // misma ruta que usa la persona 1
+        this.load.image('fish_blue', assets + 'fish_blue.png');
+        this.load.image('bubble_a', assets + 'bubble_a.png');
+        this.load.image('bubble_c', assets + 'bubble_c.png');
     }
 
     create() {
         // 1. Fondo del océano y variables de estado del jugador (Integrante 2)
+        const W = this.scale.width;   // el tamaño lo define main.js (persona 1)
+        const H = this.scale.height;
         this.cameras.main.setBackgroundColor('#005b82');
         this.lives = 3;
         this.hasRapidFire = false;
         this.lastFired = 0;
         this.invulnerable = false;   // evita perder varias vidas de golpe
-        this.powerUpTimer = null;
+        this.powerUpTimer = null;    // temporizador del power-up activo
 
-        // 2. Generar texturas temporales para Jugador, Burbujas y Power-ups
+        // 2. Texturas temporales (se usan solo si el sprite real no está cargado)
         this.createTempTextures();
 
         // 3. Suelo marino estático con Arcade Physics
         this.platforms = this.physics.add.staticGroup();
-        const ground = this.add.rectangle(400, 565, 800, 70, 0x143d59);
+        const ground = this.add.rectangle(W / 2, H - 35, W, 70, 0x143d59);
         this.physics.add.existing(ground, true);
         this.platforms.add(ground);
 
-        // 4. Jugador (Pez con físicas y rebote)
+        // 4. Jugador (pez con físicas y rebote)
+        // AQUÍ VA EL NOMBRE DEL SPRITE DEL PEZ
+        // Si 'fish_blue' fue cargado por la persona 1, se usa; si no, la bola temporal
         const fishKey = this.textures.exists('fish_blue') ? 'fish_blue' : 'tempFish';
         this.player = this.physics.add.image(150, 300, fishKey);
         if (fishKey === 'fish_blue') {
-            this.player.setScale(0.8); 
-            this.player.body.setSize(46, 28).setOffset(9, 17); 
+            this.player.setScale(0.8); // el sprite mide 64x64; ajusta 0.8 si se ve grande/pequeño
+            this.player.body.setSize(46, 28).setOffset(9, 17); // caja de colisión ajustada al pez
         }
         this.player.setCollideWorldBounds(true);
         this.player.setBounce(0.2);
         this.physics.add.collider(this.player, this.platforms);
 
-        // 5. Grupo de disparos (Burbujas)[cite: 3]
+        // 5. Grupo de disparos (burbujas)
+        // AQUÍ VA EL NOMBRE DEL SPRITE DE LA BURBUJA
         const bubbleKey = this.textures.exists('bubble_a') ? 'bubble_a' : 'tempBubble';
         this.bubbles = this.physics.add.group({
             defaultKey: bubbleKey,
             maxSize: 30
         });
 
-        // 6. Grupo de Power-ups (Estrellas/Burbujas especiales)[cite: 3]
+        // 6. Grupo de power-ups
         this.powerUps = this.physics.add.group();
         this.spawnPowerUp(500, 250);
         this.spawnPowerUp(680, 400);
 
-        // Colisión de recolección (Overlap)[cite: 3]
+        // Colisión de recolección (overlap)
         this.physics.add.overlap(this.player, this.powerUps, this.collectPowerUp, null, this);
 
-        // 7. Controles de Teclado (Flechas/WASD + Z para disparar)[cite: 3]
+        // 7. Enganches para la persona 3 (enemigos)
+        // Grupo vacío: la persona 3 agrega aquí sus enemigos
         this.enemies = this.physics.add.group();
+        // Burbuja toca enemigo / enemigo toca al jugador
         this.physics.add.overlap(this.bubbles, this.enemies, this.onBubbleHitEnemy, null, this);
         this.physics.add.overlap(this.player, this.enemies, this.onPlayerHitEnemy, null, this);
 
-        // 8. Controles Táctiles equivalentes para móvil/tablet[cite: 3]
+        // 8. Controles de teclado (flechas + Z para disparar)
         this.cursors = this.input.keyboard.createCursorKeys();
         this.fireKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
-        this.input.keyboard.enabled = true;
+        this.input.keyboard.enabled = true; // asegura el foco del teclado
 
-        // 9. Interfaz visual en pantalla para las pruebas del Integrante 2
+        // 9. Controles táctiles equivalentes para móvil/tablet
         this.input.addPointer(2); // permite hasta 3 dedos a la vez (mover + disparar)
         this.createTouchControls();
 
-        // 10. Interfaz de pruebas
+        // Pausa: tecla P o Esc, y botón ⏸ para pantallas táctiles
+        this.input.keyboard.on('keydown-P', this.pauseGame, this);
+        this.input.keyboard.on('keydown-ESC', this.pauseGame, this);
+        this.add.circle(W - 40, 40, 20, 0xffffff, 0.25)
+            .setInteractive()
+            .on('pointerdown', () => this.pauseGame());
+        this.add.text(W - 40, 40, 'II', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+
+        // 10. Interfaz de pruebas (la persona 4 hará el HUD final)
         this.statusText = this.add.text(20, 20, `Vidas: ${this.lives} | Disparo: Normal`, {
             fontFamily: 'Arial',
             fontSize: '18px',
@@ -77,7 +95,7 @@ export class GameScene extends Phaser.Scene {
             fontStyle: 'bold'
         });
 
-        this.add.text(20, 48, 'Mover: Flechas | Disparar: Z | Nadar: Espacio', {
+        this.add.text(20, 48, 'Mover: Flechas | Disparar: Z | Nadar: Espacio | Pausa: P', {
             fontFamily: 'Arial',
             fontSize: '13px',
             color: '#a0e7e5'
@@ -85,23 +103,25 @@ export class GameScene extends Phaser.Scene {
     }
 
     update(time) {
-        // Movimiento horizontal[cite: 3]
+        if (this.lives <= 0) return; // sin vidas: no se mueve ni dispara
+
+        // Movimiento horizontal
         if (this.cursors.left.isDown || this.touchState.left) {
             this.player.setVelocityX(-220);
-            this.player.setFlipX(true); // Voltea el pez a la izquierda
+            this.player.setFlipX(true); // voltea el pez a la izquierda
         } else if (this.cursors.right.isDown || this.touchState.right) {
             this.player.setVelocityX(220);
-            this.player.setFlipX(false); // Voltea el pez a la derecha
+            this.player.setFlipX(false); // voltea el pez a la derecha
         } else {
             this.player.setVelocityX(0);
         }
 
-        // Impulso de natación hacia arriba[cite: 3]
+        // Impulso de natación hacia arriba
         if (this.cursors.up.isDown || this.cursors.space.isDown || this.touchState.up) {
             this.player.setVelocityY(-250);
         }
 
-        // Sistema de disparos con cadencia[cite: 3]
+        // Sistema de disparos con cadencia
         const fireCooldown = this.hasRapidFire ? 180 : 450;
         if ((this.fireKey.isDown || this.touchState.fire) && time > this.lastFired) {
             this.shootBubble();
@@ -110,7 +130,7 @@ export class GameScene extends Phaser.Scene {
 
         // Reciclar burbujas que salen de la pantalla
         this.bubbles.getChildren().forEach((bubble) => {
-            if (bubble.active && (bubble.x > 820 || bubble.x < -20)) {
+            if (bubble.active && (bubble.x > this.scale.width + 20 || bubble.x < -20)) {
                 bubble.disableBody(true, true);
             }
         });
@@ -137,6 +157,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     spawnPowerUp(x, y) {
+        // AQUÍ VA EL NOMBRE DEL SPRITE DEL POWER-UP 
+        // El pack no trae un ítem de power-up: usamos el aro grande bubble_c, teñido de amarillo
         const powerUpKey = this.textures.exists('bubble_c') ? 'bubble_c' : 'tempPowerUp';
         const powerUp = this.powerUps.create(x, y, powerUpKey);
         powerUp.body.setAllowGravity(false);
@@ -183,7 +205,7 @@ export class GameScene extends Phaser.Scene {
         this.time.delayedCall(1000, () => { this.invulnerable = false; });
     }
 
-    // Método para que el Integrante 3 reste vidas al chocar con enemigos[cite: 3]
+    // Resta una vida y avisa a los demás módulos
     takeDamage() {
         if (this.lives <= 0) return;
         this.lives -= 1;
@@ -201,29 +223,44 @@ export class GameScene extends Phaser.Scene {
         });
 
         if (this.lives === 0) {
-            this.events.emit('player-dead'); // la persona 1 muestra Game Over
+            this.player.setVelocityX(0);
+            this.events.emit('player-dead');
+            // Flujo: sin vidas - pantalla de Game Over
+            this.time.delayedCall(800, () => this.scene.start('Derrota'));
         }
+    }
+
+    // Abre la escena de pausa; 'Pausa' se encarga de reanudar esta escena
+    pauseGame() {
+        if (this.lives <= 0) return;
+        // Suelta los botones táctiles para que el pez no siga moviéndose al volver
+        Object.keys(this.touchState).forEach((k) => { this.touchState[k] = false; });
+        this.scene.launch('Pausa');
+        this.scene.pause();
     }
 
     createTouchControls() {
         this.touchState = { left: false, right: false, up: false, fire: false };
 
         const makeButton = (x, y, label, key) => {
-            const btn = this.add.circle(x, y, 28, 0xffffff, 0.25).setInteractive(new Phaser.Geom.Circle(32, 32, 44), Phaser.Geom.Circle.Contains);
+            // Zona táctil más grande que el dibujo (radio 44 vs 32) para que sea fácil tocar con el dedo
+            const btn = this.add.circle(x, y, 32, 0xffffff, 0.25)
+                .setInteractive(new Phaser.Geom.Circle(32, 32, 44), Phaser.Geom.Circle.Contains);
             this.add.text(x, y, label, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
 
             let releaseTimer = null;
 
             const press = () => {
-              if(releaseTimer) releaseTimer.remove(false);
-              this.touchState[key] = true;
-              btn.setFillStyle(0xffffff, 0.5);
-            }
+                if (releaseTimer) releaseTimer.remove(false); // si vuelve a tocar, cancela el apagado
+                this.touchState[key] = true;
+                btn.setFillStyle(0xffffff, 0.5);              // feedback visual al presionar
+            };
 
             const release = () => {
-              btn.setFillStyle(0xffffff, 0.25);
-              releaseTimer = this.time.delayedCall(120, () => {this.touchState[key] = false; });
-            }
+                btn.setFillStyle(0xffffff, 0.25);
+                // Mantiene el botón activo 120 ms más: así un toque rápido también se registra
+                releaseTimer = this.time.delayedCall(120, () => { this.touchState[key] = false; });
+            };
 
             btn.on('pointerdown', press);
             btn.on('pointerup', release);
@@ -231,11 +268,13 @@ export class GameScene extends Phaser.Scene {
             btn.on('pointerupoutside', release);
         };
 
-        // Botones táctiles a los lados[cite: 3]
-        makeButton(60, 500, '◀', 'left');
-        makeButton(150, 500, '▶', 'right');
-        makeButton(650, 500, '▲', 'up');
-        makeButton(740, 500, '●', 'fire');
+        // Botones táctiles a los lados (posición según el tamaño del juego)
+        const W = this.scale.width;
+        const y = this.scale.height - 70;
+        makeButton(60, y, '◀', 'left');
+        makeButton(150, y, '▶', 'right');
+        makeButton(W - 150, y, '▲', 'up');
+        makeButton(W - 60, y, '●', 'fire');
     }
 
     createTempTextures() {
