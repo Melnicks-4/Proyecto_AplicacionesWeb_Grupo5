@@ -209,19 +209,33 @@ export class GameScene extends Phaser.Scene {
         this.touchState = { left: false, right: false, up: false, fire: false };
 
         const makeButton = (x, y, label, key) => {
-            const btn = this.add.circle(x, y, 28, 0xffffff, 0.25).setInteractive();
-            this.add.text(x, y, label, { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+            const btn = this.add.circle(x, y, 28, 0xffffff, 0.25).setInteractive(new Phaser.Geom.Circle(32, 32, 44), Phaser.Geom.Circle.Contains);
+            this.add.text(x, y, label, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
 
-            btn.on('pointerdown', () => { this.touchState[key] = true; });
-            btn.on('pointerup', () => { this.touchState[key] = false; });
-            btn.on('pointerout', () => { this.touchState[key] = false; });
+            let releaseTimer = null;
+
+            const press = () => {
+              if(releaseTimer) releaseTimer.remove(false);
+              this.touchState[key] = true;
+              btn.setFillStyle(0xffffff, 0.5);
+            }
+
+            const release = () => {
+              btn.setFillStyle(0xffffff, 0.25);
+              releaseTimer = this.time.delayedCall(120, () => {this.touchState[key] = false; });
+            }
+
+            btn.on('pointerdown', press);
+            btn.on('pointerup', release);
+            btn.on('pointerout', release);
+            btn.on('pointerupoutside', release);
         };
 
         // Botones táctiles a los lados[cite: 3]
         makeButton(60, 500, '◀', 'left');
-        makeButton(130, 500, '▶', 'right');
+        makeButton(150, 500, '▶', 'right');
         makeButton(650, 500, '▲', 'up');
-        makeButton(730, 500, '●', 'fire');
+        makeButton(740, 500, '●', 'fire');
     }
 
     createTempTextures() {
