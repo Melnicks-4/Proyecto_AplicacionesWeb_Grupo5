@@ -91,20 +91,21 @@ export class GameScene extends Phaser.Scene {
         // Reciclar burbujas que salen de la pantalla
         this.bubbles.getChildren().forEach((bubble) => {
             if (bubble.active && (bubble.x > 820 || bubble.x < -20)) {
-                bubble.setActive(false).setVisible(false);
+                bubble.disableBody(true, true);
             }
         });
     }
 
     shootBubble() {
         const bubble = this.bubbles.get(this.player.x, this.player.y);
-        if (bubble) {
-            bubble.setActive(true).setVisible(true);
-            bubble.body.setAllowGravity(false);
-            const direction = this.player.flipX ? -1 : 1;
-            bubble.setVelocityX(450 * direction);
-            bubble.setVelocityY(-20);
-        }
+        if (!bubble) return; // ya hay 30 burbujas en pantalla
+
+        // Reactiva el cuerpo físico y lo coloca en el pez
+        bubble.enableBody(true, this.player.x, this.player.y, true, true);
+        bubble.body.setAllowGravity(false);
+
+        const direction = this.player.flipX ? -1 : 1;
+        bubble.setVelocity(450 * direction, -20);
     }
 
     spawnPowerUp(x, y) {
