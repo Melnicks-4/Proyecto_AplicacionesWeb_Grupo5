@@ -35,10 +35,10 @@ export class GameScene extends Phaser.Scene {
         this.platforms.add(ground);
 
         // 4. Jugador (pez con físicas y rebote)
-        // AQUÍ VA EL NOMBRE DEL SPRITE DEL PEZ
+        // *** AQUÍ VA EL NOMBRE DEL SPRITE DEL PEZ ***
         // Si 'fish_orange' fue cargado por la persona 1, se usa; si no, la bola temporal
         const fishKey = this.textures.exists('fish_orange') ? 'fish_orange' : 'tempFish';
-        this.player = this.physics.add.image(150, 300, fishKey);
+        this.player = this.physics.add.image(W * 0.3, 300, fishKey);
         if (fishKey === 'fish_orange') {
             this.player.setScale(0.8); // el sprite mide 64x64; ajusta 0.8 si se ve grande/pequeño
             this.player.body.setSize(46, 28).setOffset(9, 17); // caja de colisión ajustada al pez
@@ -48,7 +48,7 @@ export class GameScene extends Phaser.Scene {
         this.physics.add.collider(this.player, this.platforms);
 
         // 5. Grupo de disparos (burbujas)
-        // AQUÍ VA EL NOMBRE DEL SPRITE DE LA BURBUJA
+        // *** AQUÍ VA EL NOMBRE DEL SPRITE DE LA BURBUJA ***
         const bubbleKey = this.textures.exists('bubble_a') ? 'bubble_a' : 'tempBubble';
         this.bubbles = this.physics.add.group({
             defaultKey: bubbleKey,
@@ -85,7 +85,7 @@ export class GameScene extends Phaser.Scene {
         this.add.circle(W - 40, 40, 20, 0xffffff, 0.25)
             .setInteractive()
             .on('pointerdown', () => this.pauseGame());
-        this.add.text(W - 40, 40, 'II', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.text(W - 40, 40, '||', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
 
         // 10. Interfaz de pruebas (la persona 4 hará el HUD final)
         this.statusText = this.add.text(20, 20, `Vidas: ${this.lives} | Disparo: Normal`, {
@@ -157,7 +157,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     spawnPowerUp(x, y) {
-        // AQUÍ VA EL NOMBRE DEL SPRITE DEL POWER-UP 
+        // *** AQUÍ VA EL NOMBRE DEL SPRITE DEL POWER-UP ***
         // El pack no trae un ítem de power-up: usamos el aro grande bubble_c, teñido de amarillo
         const powerUpKey = this.textures.exists('bubble_c') ? 'bubble_c' : 'tempPowerUp';
         const powerUp = this.powerUps.create(x, y, powerUpKey);
@@ -225,7 +225,7 @@ export class GameScene extends Phaser.Scene {
         if (this.lives === 0) {
             this.player.setVelocityX(0);
             this.events.emit('player-dead');
-            // Flujo: sin vidas - pantalla de Game Over
+            // Flujo: sin vidas → pantalla de Game Over (escena 'Derrota' de la persona 1)
             this.time.delayedCall(800, () => this.scene.start('Derrota'));
         }
     }
@@ -233,6 +233,11 @@ export class GameScene extends Phaser.Scene {
     // Abre la escena de pausa; 'Pausa' se encarga de reanudar esta escena
     pauseGame() {
         if (this.lives <= 0) return;
+        // Si la escena 'Pausa' no está registrada en main.js, no pausamos (el juego quedaría congelado)
+        if (!this.scene.manager.keys['Pausa']) {
+            console.warn("Falta registrar la escena 'Pausa' en main.js (persona 1)");
+            return;
+        }
         // Suelta los botones táctiles para que el pez no siga moviéndose al volver
         Object.keys(this.touchState).forEach((k) => { this.touchState[k] = false; });
         this.scene.launch('Pausa');
@@ -270,7 +275,7 @@ export class GameScene extends Phaser.Scene {
 
         // Botones táctiles a los lados (posición según el tamaño del juego)
         const W = this.scale.width;
-        const y = this.scale.height - 70;
+        const y = this.scale.height - 130; // por encima del suelo marino
         makeButton(60, y, '◀', 'left');
         makeButton(150, y, '▶', 'right');
         makeButton(W - 150, y, '▲', 'up');

@@ -35,6 +35,7 @@ export class Menu extends Phaser.Scene {
 export class Pausa extends Phaser.Scene {
   constructor() {
     super('Pausa');
+    
   }
 
   create() {
