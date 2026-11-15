@@ -14,7 +14,7 @@ const config = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [GameScene] // <-- Debe estar GameScene aquí
+    scene: [Inicio, Menu, GameScene, Pausa, Victoria, Derrota]
 };
 
 export default new Phaser.Game(config);
