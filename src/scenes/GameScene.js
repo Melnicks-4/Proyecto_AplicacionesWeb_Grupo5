@@ -48,11 +48,13 @@ export class GameScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
 
         // Instrucciones en pantalla
-        this.add.text(400, 100, 'Usa las Flechas / WASD para moverte y la barra espaciadora para nadar', {
+        this.add.text(400, 100, 'Usa las Flechas para moverte y la barra espaciadora para nadar', {
             fontFamily: 'Arial',
             fontSize: '14px',
             color: '#f9ed69'
         }).setOrigin(0.5);
+
+        this.input.keyboard.enabled = true;
     }
 
     update() {
