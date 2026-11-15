@@ -19,6 +19,17 @@ export class GameScene extends Phaser.Scene {
         const W = this.scale.width;   // el tamaño lo define main.js (persona 1)
         const H = this.scale.height;
         this.cameras.main.setBackgroundColor('#005b82');
+        // Fondo de agua: el tile mide 64x64, se REPITE para cubrir toda la pantalla
+        if (this.textures.exists('fondo-marino')) {
+            this.add.tileSprite(0, 0, W, H, 'fondo-marino').setOrigin(0x7aa9c4);
+        }
+
+        // Algas decorativas apoyadas en el suelo
+        if (this.textures.exists('alga')) {
+            [80, 330, 600, 860].forEach((x) => {
+                this.add.image(x, H - 70, 'alga').setOrigin(0.5, 1);
+            });
+        }
         this.lives = 3;
         this.hasRapidFire = false;
         this.lastFired = 0;
