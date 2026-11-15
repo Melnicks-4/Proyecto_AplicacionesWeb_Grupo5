@@ -5,12 +5,20 @@ export class GameScene extends Phaser.Scene {
         super('GameScene');
     }
 
+    preload() {
+        this.load.image('fish_blue', 'assets/images/fish_blue.png');
+        this.load.image('bubble_a', 'assets/images/bubble_a.png');
+        this.load.image('bubble_c', 'assets/images/bubble_c.png');
+    }
+
     create() {
         // 1. Fondo del océano y variables de estado del jugador (Integrante 2)
         this.cameras.main.setBackgroundColor('#005b82');
         this.lives = 3;
         this.hasRapidFire = false;
         this.lastFired = 0;
+        this.invulnerable = false;   // evita perder varias vidas de golpe
+        this.powerUpTimer = null;
 
         // 2. Generar texturas temporales para Jugador, Burbujas y Power-ups
         this.createTempTextures();
@@ -22,14 +30,20 @@ export class GameScene extends Phaser.Scene {
         this.platforms.add(ground);
 
         // 4. Jugador (Pez con físicas y rebote)
-        this.player = this.physics.add.image(150, 300, 'tempFish');
+        const fishKey = this.textures.exists('fish_blue') ? 'fish_blue' : 'tempFish';
+        this.player = this.physics.add.image(150, 300, fishKey);
+        if (fishKey === 'fish_blue') {
+            this.player.setScale(0.8); 
+            this.player.body.setSize(46, 28).setOffset(9, 17); 
+        }
         this.player.setCollideWorldBounds(true);
         this.player.setBounce(0.2);
         this.physics.add.collider(this.player, this.platforms);
 
         // 5. Grupo de disparos (Burbujas)[cite: 3]
+        const bubbleKey = this.textures.exists('bubble_a') ? 'bubble_a' : 'tempBubble';
         this.bubbles = this.physics.add.group({
-            defaultKey: 'tempBubble',
+            defaultKey: bubbleKey,
             maxSize: 30
         });
 
@@ -42,14 +56,20 @@ export class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.player, this.powerUps, this.collectPowerUp, null, this);
 
         // 7. Controles de Teclado (Flechas/WASD + Z para disparar)[cite: 3]
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.fireKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
-        this.input.keyboard.enabled = true; // Asegura el foco del teclado
+        this.enemies = this.physics.add.group();
+        this.physics.add.overlap(this.bubbles, this.enemies, this.onBubbleHitEnemy, null, this);
+        this.physics.add.overlap(this.player, this.enemies, this.onPlayerHitEnemy, null, this);
 
         // 8. Controles Táctiles equivalentes para móvil/tablet[cite: 3]
-        this.createTouchControls();
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.fireKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
+        this.input.keyboard.enabled = true;
 
         // 9. Interfaz visual en pantalla para las pruebas del Integrante 2
+        this.input.addPointer(2); // permite hasta 3 dedos a la vez (mover + disparar)
+        this.createTouchControls();
+
+        // 10. Interfaz de pruebas
         this.statusText = this.add.text(20, 20, `Vidas: ${this.lives} | Disparo: Normal`, {
             fontFamily: 'Arial',
             fontSize: '18px',
@@ -104,13 +124,27 @@ export class GameScene extends Phaser.Scene {
         bubble.enableBody(true, this.player.x, this.player.y, true, true);
         bubble.body.setAllowGravity(false);
 
+        // El aro de bubble_a es pequeño: se agranda y su colisión se ajusta al aro
+        if (bubble.texture.key === 'bubble_a') {
+            bubble.setScale(2);
+            bubble.body.setCircle(8, 24, 24);
+        }
+
         const direction = this.player.flipX ? -1 : 1;
         bubble.setVelocity(450 * direction, -20);
+
+        this.events.emit('player-shoot'); // la persona 4 conecta el sonido
     }
 
     spawnPowerUp(x, y) {
-        const powerUp = this.powerUps.create(x, y, 'tempPowerUp');
+        const powerUpKey = this.textures.exists('bubble_c') ? 'bubble_c' : 'tempPowerUp';
+        const powerUp = this.powerUps.create(x, y, powerUpKey);
         powerUp.body.setAllowGravity(false);
+        if (powerUpKey === 'bubble_c') {
+            powerUp.setTint(0xf9ed69);
+            powerUp.setScale(1.2);
+            powerUp.body.setCircle(14, 18, 18);
+        }
         // Animación flotante
         this.tweens.add({
             targets: powerUp,
@@ -124,18 +158,37 @@ export class GameScene extends Phaser.Scene {
     collectPowerUp(player, powerUp) {
         powerUp.destroy();
         this.hasRapidFire = true;
+        this.events.emit('powerup-collected'); // sonido (persona 4) y efectos (persona 3)
         this.statusText.setText(`Vidas: ${this.lives} | Disparo: RÁPIDO (Power-up activo)`);
 
-        // Duración del power-up: 6 segundos
-        this.time.delayedCall(6000, () => {
+        // Si ya había un temporizador, lo cancelamos y empezamos de nuevo
+        if (this.powerUpTimer) this.powerUpTimer.remove(false);
+        this.powerUpTimer = this.time.delayedCall(6000, () => {
             this.hasRapidFire = false;
             this.statusText.setText(`Vidas: ${this.lives} | Disparo: Normal`);
         });
     }
 
+    // La burbuja desaparece; la persona 3 decide qué le pasa al enemigo y el puntaje
+    onBubbleHitEnemy(bubble, enemy) {
+        bubble.disableBody(true, true);
+        this.events.emit('enemy-hit', enemy);
+    }
+
+    // Choque con enemigo: pierde una vida y queda protegido 1 segundo
+    onPlayerHitEnemy() {
+        if (this.invulnerable) return;
+        this.invulnerable = true;
+        this.takeDamage();
+        this.time.delayedCall(1000, () => { this.invulnerable = false; });
+    }
+
     // Método para que el Integrante 3 reste vidas al chocar con enemigos[cite: 3]
     takeDamage() {
-        this.lives = Math.max(0, this.lives - 1);
+        if (this.lives <= 0) return;
+        this.lives -= 1;
+        this.events.emit('lives-changed', this.lives); // para el HUD (persona 4)
+
         const mode = this.hasRapidFire ? 'RÁPIDO' : 'Normal';
         this.statusText.setText(`Vidas: ${this.lives} | Disparo: ${mode}`);
 
@@ -146,6 +199,10 @@ export class GameScene extends Phaser.Scene {
             yoyo: true,
             repeat: 3
         });
+
+        if (this.lives === 0) {
+            this.events.emit('player-dead'); // la persona 1 muestra Game Over
+        }
     }
 
     createTouchControls() {
