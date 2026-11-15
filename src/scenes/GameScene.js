@@ -57,7 +57,7 @@ export class GameScene extends Phaser.Scene {
             fontStyle: 'bold'
         });
 
-        this.add.text(20, 48, 'Mover: Flechas/WASD | Disparar: Z | Nadar: Espacio', {
+        this.add.text(20, 48, 'Mover: Flechas | Disparar: Z | Nadar: Espacio', {
             fontFamily: 'Arial',
             fontSize: '13px',
             color: '#a0e7e5'
