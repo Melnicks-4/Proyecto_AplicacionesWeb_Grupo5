@@ -10,7 +10,7 @@ export class Inicio extends Phaser.Scene {
   preload() {
     texto(this, 480, 270, 'Cargando recursos…', 26);
     const assets = import.meta.env.BASE_URL + 'assets/images/';
-    this.load.image('pez', assets + 'fish_blue.png');
+    this.load.image('pez', assets + 'fish_orange.png');
     this.load.image('fondo-marino', assets + 'background_terrain.png');
     this.load.image('alga', assets + 'background_seaweed_a.png');
   }

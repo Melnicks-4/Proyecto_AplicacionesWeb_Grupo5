@@ -9,7 +9,7 @@ export class GameScene extends Phaser.Scene {
     // todavía no los cargó. Si ya existen con ese nombre, Phaser los ignora.
     preload() {
         const assets = import.meta.env.BASE_URL + 'assets/images/'; // misma ruta que usa la persona 1
-        this.load.image('fish_blue', assets + 'fish_blue.png');
+        this.load.image('fish_orange', assets + 'fish_orange.png');
         this.load.image('bubble_a', assets + 'bubble_a.png');
         this.load.image('bubble_c', assets + 'bubble_c.png');
     }
@@ -36,10 +36,10 @@ export class GameScene extends Phaser.Scene {
 
         // 4. Jugador (pez con físicas y rebote)
         // AQUÍ VA EL NOMBRE DEL SPRITE DEL PEZ
-        // Si 'fish_blue' fue cargado por la persona 1, se usa; si no, la bola temporal
-        const fishKey = this.textures.exists('fish_blue') ? 'fish_blue' : 'tempFish';
+        // Si 'fish_orange' fue cargado por la persona 1, se usa; si no, la bola temporal
+        const fishKey = this.textures.exists('fish_orange') ? 'fish_orange' : 'tempFish';
         this.player = this.physics.add.image(150, 300, fishKey);
-        if (fishKey === 'fish_blue') {
+        if (fishKey === 'fish_orange') {
             this.player.setScale(0.8); // el sprite mide 64x64; ajusta 0.8 si se ve grande/pequeño
             this.player.body.setSize(46, 28).setOffset(9, 17); // caja de colisión ajustada al pez
         }
