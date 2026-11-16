@@ -67,6 +67,7 @@ export class GameScene extends Phaser.Scene {
         this.enemiesInCurrentWave = 0;
         this.pointsPerEnemy = 100;
         this.currentWave = 0;
+        this.boss = null;
         this.score = 0;
         this.resultadoPendiente = false;
         this.spawnedThisWave = 0;
@@ -215,6 +216,8 @@ export class GameScene extends Phaser.Scene {
     update(time, delta) {
         if (this.lives <= 0) return;
 
+        if (this.boss?.active) this.actualizarDisparosJefe();
+
         const empuje = this.currentWave === 2 && !this.isRoundTransitioning
             ? this.corriente.actualizar(delta) : 0;
 
@@ -260,8 +263,9 @@ export class GameScene extends Phaser.Scene {
         this.enemies.getChildren().forEach((enemy) => {
             if (!enemy.active) return;
             const direction = this.player.x < enemy.x ? -1 : 1;
-            enemy.setVelocityX(direction * enemy.moveSpeed);
-            if (enemy.isBoss) enemy.setVelocityY(Math.sin(time / 450) * 70);
+            const cargando = enemy.isBoss && enemy.inflado;
+            enemy.setVelocityX(cargando ? 0 : direction * enemy.moveSpeed);
+            if (enemy.isBoss) enemy.setVelocityY(cargando ? 0 : Math.sin(time / 450) * 45);
             enemy.setFlipX(direction < 0);
         });
 
@@ -306,7 +310,8 @@ export class GameScene extends Phaser.Scene {
         boss.isBoss = true;
         boss.health = 12;
         boss.maxHealth = boss.health;
-        boss.moveSpeed = 100;
+        boss.moveSpeed = 65;
+        boss.inflado = false;
         this.boss = boss;
         this.spawnedThisWave = 1;
 
@@ -327,14 +332,70 @@ export class GameScene extends Phaser.Scene {
             .setDepth(11);
         this.updateBossHealth();
 
-        this.tweens.add({
-            targets: boss,
-            scaleX: 2.1,
-            scaleY: 2.1,
-            duration: 700,
-            yoyo: true,
-            repeat: -1
+        this.estadoJefe = this.add.text(centerX, 148, '', {
+            fontFamily: 'Arial',
+            fontSize: '18px',
+            backgroundColor: '#07334c',
+            color: '#ffffff',
+            padding: { x: 10, y: 4 }
+        }).setOrigin(0.5).setDepth(10);
+        this.disparosJefe = this.physics.add.group({ defaultKey: 'bubble_b', maxSize: 15 });
+        this.physics.add.overlap(this.player, this.disparosJefe, (player, disparo) => {
+            disparo.disableBody(true, true);
+            if (!this.invulnerable && !this.poderManager.tieneEscudo()) {
+                this.invulnerable = true;
+                this.takeDamage();
+                this.time.delayedCall(1000, () => { this.invulnerable = false; });
+            }
         });
+        this.abrirVentanaJefe(boss);
+    }
+
+    abrirVentanaJefe(boss) {
+        boss.inflado = false;
+        boss.setScale(2).clearTint();
+        this.estadoJefe.setText('Vulnerable · ¡Dispara!');
+        this.time.delayedCall(2600, () => {
+            if (!boss.active || this.lives <= 0) return;
+
+            boss.inflado = true;
+            boss.setScale(2.35).setTint(0xffc66e);
+            boss.setVelocity(0, 0);
+            this.estadoJefe.setText('Inflado · ¡Esquiva la ráfaga!');
+            const angulo = Phaser.Math.Angle.Between(boss.x, boss.y, this.player.x, this.player.y);
+
+            this.time.delayedCall(1100, () => {
+                if (!boss.active || this.lives <= 0) return;
+                this.lanzarRafagaJefe(boss, angulo);
+                this.abrirVentanaJefe(boss);
+            });
+        });
+    }
+
+    lanzarRafagaJefe(boss, angulo) {
+        for (const apertura of [-0.52, -0.26, 0, 0.26, 0.52]) {
+            const direccion = angulo + apertura;
+            const x = boss.x + Math.cos(direccion) * 55;
+            const y = boss.y + Math.sin(direccion) * 55;
+            const disparo = this.disparosJefe.get(x, y);
+            if (!disparo) break;
+            disparo.enableBody(true, x, y, true, true);
+            disparo.setScale(0.3).setTint(0xff8b77).setDepth(4);
+            disparo.body.setCircle(disparo.width * 0.27, disparo.width * 0.23, disparo.height * 0.23);
+            disparo.body.setAllowGravity(false);
+            disparo.setVelocity(Math.cos(direccion) * 260, Math.sin(direccion) * 260);
+        }
+    }
+
+    actualizarDisparosJefe() {
+        for (const disparo of this.disparosJefe.getChildren()) {
+            if (disparo.active && (
+                disparo.x < -40 || disparo.x > this.scale.width + 40 ||
+                disparo.y < -40 || disparo.y > this.scale.height + 40
+            )) {
+                disparo.disableBody(true, true);
+            }
+        }
     }
 
     updateBossHealth() {
@@ -434,6 +495,11 @@ export class GameScene extends Phaser.Scene {
 
     onBubbleHitEnemy(bubble, enemy) {
         if (!enemy.active || !bubble.body.enable || bubble.hitEnemies.has(enemy)) return;
+        if (enemy.isBoss && enemy.inflado) {
+            this.tweens.killTweensOf(bubble);
+            bubble.disableBody(true, true);
+            return;
+        }
         bubble.hitEnemies.add(enemy);
         if (!bubble.didGrowOnHit) {
             bubble.didGrowOnHit = true;
@@ -457,12 +523,13 @@ export class GameScene extends Phaser.Scene {
 
     damageEnemy(enemy) {
         if (enemy.isBoss) {
+            if (enemy.inflado) return;
             enemy.health -= 1;
             this.updateBossHealth();
             if (enemy.health > 0) {
                 enemy.setTint(0xff7777);
                 this.time.delayedCall(100, () => {
-                    if (enemy.active) enemy.clearTint();
+                    if (enemy.active && !enemy.inflado) enemy.clearTint();
                 });
                 return;
             }
@@ -474,6 +541,8 @@ export class GameScene extends Phaser.Scene {
         if (!enemy || !enemy.active) return;
         if (enemy.isBoss) {
             this.tweens.killTweensOf(enemy);
+            this.estadoJefe.setVisible(false);
+            this.disparosJefe.clear(true, true);
             this.bossHealthText.setVisible(false);
             this.bossHealthBackground.setVisible(false);
             this.bossHealthBar.setVisible(false);
