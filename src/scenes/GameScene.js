@@ -7,6 +7,8 @@ import { AudioManager } from '../audio/AudioManager.js';
 import { PoderManager } from '../managers/PoderManager.js';
 import { CLAVE_PEZ, obtenerPez } from '../data/peces.js';
 import { ALTO_SUELO, crearSuelo } from '../objects/suelo.js';
+import { cargarImagenes } from '../assets/manifest.js';
+import { registrarColisiones, registrarColisionDisparosJefe } from '../physics/colisiones.js';
 import bubbleAudioUrl from '../audio/bubble.mp3';
 import oceanAudioUrl from '../audio/Ocean.mp3';
 import powerUpAudioUrl from '../audio/power_up.mp3';
@@ -19,29 +21,7 @@ export class GameScene extends Phaser.Scene {
     // Carga de respaldo: solo agrega los sprites si la escena de carga (persona 1)
     // todavía no los cargó. Si ya existen con ese nombre, Phaser los ignora.
     preload() {
-        const assets = import.meta.env.BASE_URL + 'assets/images/'; // misma ruta que usa la persona 1
-        ['fish_orange', 'fish_blue', 'fish_green', 'fish_pink'].forEach((key) => {
-            if (!this.textures.exists(key)) this.load.image(key, assets + key + '.png');
-        });
-        [
-            ['arena_top', 'terrain_sand_top_e.png'],
-            ['roca_a', 'rock_a.png'],
-            ['roca_b', 'rock_b.png'],
-            ['alga_verde', 'seaweed_green_a.png'],
-            ['alga_rosa', 'seaweed_pink_a.png'],
-            ['alga_naranja', 'seaweed_orange_a.png']
-        ].forEach(([key, file]) => {
-            if (!this.textures.exists(key)) this.load.image(key, assets + file);
-        });
-        if (!this.textures.exists('pufferBoss')) {
-            this.load.image('pufferBoss', assets + 'fish_brown_outline.png');
-        }
-        this.load.image('fish_blue_skeleton_outline', assets + 'fish_blue_skeleton_outline.png');
-        this.load.image('fish_green_skeleton_outline', assets + 'fish_green_skeleton_outline.png');
-        this.load.image('fish_red_skeleton_outline', assets + 'fish_red_skeleton_outline.png');
-        this.load.image('bubble_a', assets + 'bubble_a.png');
-        this.load.image('bubble_b', assets + 'bubble_b.png');
-        this.load.image('bubble_c', assets + 'bubble_c.png');
+        cargarImagenes(this, true);
         this.load.audio('bubble', bubbleAudioUrl);
         this.load.audio('ocean', oceanAudioUrl);
         this.load.audio('power_up', powerUpAudioUrl);
@@ -116,7 +96,6 @@ export class GameScene extends Phaser.Scene {
             .setStrokeStyle(3, 0x8effdc).setDepth(4).setVisible(false);
         this.player.setCollideWorldBounds(true);
         this.player.setBounce(0.2);
-        this.physics.add.collider(this.player, this.platforms);
         this.poderManager = new PoderManager(this, this.pez);
 
         // 5. Grupo de disparos (burbujas)
@@ -131,29 +110,11 @@ export class GameScene extends Phaser.Scene {
         this.powerUps = this.physics.add.group();
         this.spawnPowerUp(500, 250);
         this.spawnPowerUp(680, 400);
-
-        // Colisión de recolección (overlap)
-        this.physics.add.overlap(this.player, this.powerUps, this.collectPowerUp, null, this);
         this.vidasExtra = this.physics.add.group();
-        this.physics.add.overlap(this.player, this.vidasExtra, (player, burbuja) => {
-            if (this.lives <= 0 || (this.lives === 3 && this.escudoExtra.visible)) return;
-
-            burbuja.etiqueta.destroy();
-            burbuja.destroy();
-            if (this.lives < 3) {
-                this.lives += 1;
-                this.actualizarEstado();
-                this.events.emit('lives-changed', this.lives);
-            } else {
-                this.escudoExtra.setPosition(player.x, player.y).setVisible(true);
-            }
-            this.audioManager.play('power_up');
-        });
 
         // 7. Enemigos y colisiones
         this.enemies = this.physics.add.group();
-        this.physics.add.overlap(this.bubbles, this.enemies, this.onBubbleHitEnemy, null, this);
-        this.physics.add.overlap(this.player, this.enemies, this.onPlayerHitEnemy, null, this);
+        registrarColisiones(this);
 
         // 8. Controles de teclado (flechas + Z para disparar)
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -450,10 +411,7 @@ export class GameScene extends Phaser.Scene {
             padding: { x: 10, y: 4 }
         }).setOrigin(0.5).setDepth(10);
         this.disparosJefe = this.physics.add.group({ defaultKey: 'bubble_b', maxSize: 15 });
-        this.physics.add.overlap(this.player, this.disparosJefe, (player, disparo) => {
-            disparo.disableBody(true, true);
-            this.recibirGolpeAmbiental();
-        });
+        registrarColisionDisparosJefe(this);
         this.abrirVentanaJefe(boss);
     }
 
@@ -652,6 +610,21 @@ export class GameScene extends Phaser.Scene {
         this.poderManager.activar();
         this.audioManager.play('power_up');
         this.events.emit('powerup-collected', this.pez.poder); // sonido (persona 4) y efectos (persona 3)
+    }
+
+    collectExtraLife(player, burbuja) {
+        if (this.lives <= 0 || (this.lives === 3 && this.escudoExtra.visible)) return;
+
+        burbuja.etiqueta.destroy();
+        burbuja.destroy();
+        if (this.lives < 3) {
+            this.lives += 1;
+            this.actualizarEstado();
+            this.events.emit('lives-changed', this.lives);
+        } else {
+            this.escudoExtra.setPosition(player.x, player.y).setVisible(true);
+        }
+        this.audioManager.play('power_up');
     }
 
     onBubbleHitEnemy(bubble, enemy) {

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-import { texto, boton } from './ui.js';
+import { texto, boton } from '../ui/ui.js';
 import { PECES, CLAVE_PEZ } from '../data/peces.js';
 
 // Pantalla para escoger el pez antes de jugar.

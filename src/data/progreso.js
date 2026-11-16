@@ -33,3 +33,32 @@ export function guardarResultado(puntaje, nivel) {
 
     return { puntaje, nivel, record: progreso.puntaje, nuevoRecord };
 }
+
+const CLAVE_AUDIO = 'angry-fins.audio';
+let audioSilenciado = false;
+let audioActualizadoEnMemoria = false;
+
+export function leerConfigAudio() {
+    if (audioActualizadoEnMemoria) {
+        return { silenciado: audioSilenciado };
+    }
+
+    try {
+        const guardado = JSON.parse(localStorage.getItem(CLAVE_AUDIO));
+        audioSilenciado = guardado?.silenciado === true;
+    } catch {
+        return { silenciado: audioSilenciado };
+    }
+    return { silenciado: audioSilenciado };
+}
+
+export function guardarConfigAudio(silenciado) {
+    audioSilenciado = silenciado === true;
+    audioActualizadoEnMemoria = true;
+    try {
+        localStorage.setItem(CLAVE_AUDIO, JSON.stringify({ silenciado: audioSilenciado }));
+        audioActualizadoEnMemoria = false;
+    } catch {
+        // Si no se puede guardar, la configuración dura solo esta sesión.
+    }
+}

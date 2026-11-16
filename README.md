@@ -45,15 +45,29 @@ Cada nivel tiene una burbuja verde con un signo **+**. Recógela para recuperar 
 
 Cada enemigo normal suma **100 puntos** y el jefe suma **1000**. Las pantallas **GAME WINNER** y **Game Over** muestran el puntaje final y el nivel alcanzado. El menú muestra el récord y el nivel máximo guardados en el navegador.
 
+## Audio y persistencia
+
+- La música y los efectos se pueden silenciar desde el menú o durante la partida. La preferencia se conserva al recargar la página mediante `localStorage`.
+- El navegador también guarda el récord de puntaje y el nivel máximo alcanzado.
+
 ## Estructura del proyecto
 
 El juego usa HTML, CSS y JavaScript con Phaser 4 y Arcade Physics. Vite sirve y compila el proyecto.
 
-- `src/main.js` configura Phaser y registra las escenas.
-- `src/scenes/` contiene el menú, la selección de pez, la partida, la pausa y las pantallas finales.
-- `src/managers/` contiene la lógica de los poderes, la marea y la tormenta.
-- `src/data/` define los peces y guarda el progreso local.
-- `public/assets/` contiene los sprites y su licencia.
+```text
+src/
+├── main.js        Configura Phaser y registra las escenas
+├── scenes/        Menú, selección de pez, partida, pausa y pantallas finales
+├── ui/            Texto y botones compartidos por las escenas
+├── objects/       Suelo de arena y túnel de coral
+├── physics/       Registro de colisiones de Arcade Physics
+├── managers/      Lógica de poderes, marea y tormenta
+├── audio/         AudioManager, música y efectos
+├── assets/        Manifiesto de imágenes del loader
+└── data/          Peces y persistencia local
+public/assets/     Sprites y licencia
+docs/capturas/     Capturas del juego
+```
 
 ## Compilación
 
@@ -66,7 +80,13 @@ El primer comando genera `dist/`. El segundo sirve esa compilación localmente. 
 
 ## Créditos
 
-Proyecto del Grupo 5 para Aplicaciones Web. Los sprites pertenecen al paquete **Fish Pack** de Kenney. Consulta la [licencia de los sprites](public/assets/License.txt).
+Proyecto del Grupo 5 para Aplicaciones Web. Los sprites pertenecen al paquete **Fish Pack** de Kenney, publicado bajo **CC0**. Consulta la [licencia de los sprites](public/assets/License.txt).
+
+Créditos de audio:
+
+- `Ocean.mp3`: **Ocean Theme / Brave New Ocean Loopable**, de [Wolfgang_](https://opengameart.org/users/wolfgang), bajo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [Fuente en OpenGameArt](https://opengameart.org/content/ocean-theme).
+- `power_up.mp3`: **Power Up Sparkle 1**, de [floraphonic en Pixabay](https://pixabay.com/users/floraphonic-38928062/).
+- `bubble.mp3`: **bubble popping 3**, de [Cherskis en Pixabay](https://pixabay.com/users/cherskis-57156194/).
 
 ## Medallas
 

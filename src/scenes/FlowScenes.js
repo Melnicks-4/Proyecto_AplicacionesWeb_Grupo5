@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 
 import { leerProgreso } from '../data/progreso.js';
-import { texto, boton } from './ui.js';
+import { AudioManager } from '../audio/AudioManager.js';
+import { cargarImagenes } from '../assets/manifest.js';
+import { texto, boton } from '../ui/ui.js';
 
 export class Inicio extends Phaser.Scene {
   constructor() {
@@ -10,21 +12,7 @@ export class Inicio extends Phaser.Scene {
 
   preload() {
     texto(this, 480, 270, 'Cargando recursos…', 26);
-    const assets = import.meta.env.BASE_URL + 'assets/images/';
-    this.load.image('pez', assets + 'fish_orange.png');
-    this.load.image('fondo-marino', assets + 'background_terrain.png');
-    this.load.image('alga', assets + 'background_seaweed_a.png');
-
-    ['fish_orange', 'fish_blue', 'fish_green', 'fish_pink'].forEach((clave) => {
-      this.load.image(clave, assets + clave + '.png');
-    });
-
-    this.load.image('arena_top', assets + 'terrain_sand_top_e.png');
-    this.load.image('roca_a', assets + 'rock_a.png');
-    this.load.image('roca_b', assets + 'rock_b.png');
-    this.load.image('alga_verde', assets + 'seaweed_green_a.png');
-    this.load.image('alga_rosa', assets + 'seaweed_pink_a.png');
-    this.load.image('alga_naranja', assets + 'seaweed_orange_a.png');
+    cargarImagenes(this);
   }
 
   create() {
@@ -38,6 +26,7 @@ export class Menu extends Phaser.Scene {
   }
 
   create() {
+    this.audioManager = new AudioManager(this);
     this.add.image(480, 118, 'pez').setScale(1.4);
     texto(this, 480, 218, 'Angry Fins', 52);
     const progreso = leerProgreso();
@@ -45,6 +34,11 @@ export class Menu extends Phaser.Scene {
       texto(this, 480, 270, `Récord: ${progreso.puntaje}  |  Nivel máximo: ${progreso.nivel}`, 20);
     }
     boton(this, 480, 335, 'Jugar', () => this.scene.start('SeleccionPez'));
+    const etiquetaSonido = this.audioManager.soundEnabled ? 'Sonido: activado' : 'Sonido: silenciado';
+    this.botonSonido = boton(this, 480, 405, etiquetaSonido, () => {
+      const soundEnabled = this.audioManager.toggleSound();
+      this.botonSonido.setText(soundEnabled ? 'Sonido: activado' : 'Sonido: silenciado');
+    });
   }
 }
 

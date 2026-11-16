@@ -1,7 +1,10 @@
+import { leerConfigAudio, guardarConfigAudio } from '../data/progreso.js';
+
 export class AudioManager {
     constructor(scene) {
         this.scene = scene;
-        this.soundEnabled = !scene.sound.mute;
+        this.soundEnabled = !leerConfigAudio().silenciado;
+        scene.sound.setMute(!this.soundEnabled);
     }
 
     play(key, config = {}) {
@@ -17,6 +20,7 @@ export class AudioManager {
     toggleSound() {
         this.soundEnabled = !this.soundEnabled;
         this.scene.sound.setMute(!this.soundEnabled);
+        guardarConfigAudio(!this.soundEnabled);
         return this.soundEnabled;
     }
 }
