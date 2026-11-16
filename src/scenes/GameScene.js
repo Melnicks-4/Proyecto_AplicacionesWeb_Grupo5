@@ -208,6 +208,7 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 2
         }).setDepth(10);
 
+        this.createMinimap();
         this.actualizarEstado();
         this.corriente = new CorrienteMarina(this);
         this.startWave();
@@ -215,6 +216,11 @@ export class GameScene extends Phaser.Scene {
 
     update(time, delta) {
         if (this.lives <= 0) return;
+
+        if (time >= this.nextMinimapUpdate) {
+            this.drawMinimap();
+            this.nextMinimapUpdate = time + 100;
+        }
 
         if (this.boss?.active) this.actualizarDisparosJefe();
 
@@ -274,6 +280,69 @@ export class GameScene extends Phaser.Scene {
             this.enemies.countActive() === 0) {
             this.finishWave();
         }
+    }
+
+    createMinimap() {
+        const panel = {
+            x: this.scale.width - 190,
+            y: 72,
+            width: 176,
+            height: 108
+        };
+        const map = {
+            x: panel.x + 8,
+            y: panel.y + 24,
+            width: panel.width - 16,
+            height: panel.height - 32
+        };
+
+        this.minimapPanel = panel;
+        this.minimapArea = map;
+        this.nextMinimapUpdate = 0;
+
+        this.add.graphics()
+            .setScrollFactor(0)
+            .setDepth(11)
+            .fillStyle(0x062b3c, 0.88)
+            .fillRect(panel.x, panel.y, panel.width, panel.height)
+            .lineStyle(2, 0x82dced, 0.95)
+            .strokeRect(panel.x, panel.y, panel.width, panel.height)
+            .fillStyle(0x0d5368, 0.55)
+            .fillRect(map.x, map.y, map.width, map.height);
+
+        this.add.text(panel.x + 8, panel.y + 4, 'MINIMAPA', {
+            fontFamily: 'Arial',
+            fontSize: '11px',
+            color: '#ffffff',
+            fontStyle: 'bold'
+        }).setScrollFactor(0).setDepth(12);
+
+        this.minimapMarkers = this.add.graphics()
+            .setScrollFactor(0)
+            .setDepth(12);
+    }
+
+    drawMinimap() {
+        const graphics = this.minimapMarkers;
+        const map = this.minimapArea;
+        graphics.clear();
+
+        const drawPoint = (entity, color, radius) => {
+            if (!entity?.active) return;
+
+            const x = map.x + Phaser.Math.Clamp(entity.x / this.scale.width, 0, 1) * map.width;
+            const y = map.y + Phaser.Math.Clamp(entity.y / this.scale.height, 0, 1) * map.height;
+            graphics.fillStyle(color, 1);
+            graphics.fillCircle(x, y, radius);
+        };
+
+        drawPoint(this.player, 0x45e6ff, 4);
+        this.enemies.getChildren().forEach((enemy) => {
+            drawPoint(enemy, enemy.isBoss ? 0xff4b4b : 0xffa0a0, enemy.isBoss ? 5 : 3);
+        });
+        this.powerUps.getChildren().forEach((powerUp) => {
+            drawPoint(powerUp, 0xffdf4d, 3);
+        });
     }
 
     startWave() {
