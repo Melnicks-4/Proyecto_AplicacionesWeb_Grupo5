@@ -1,43 +1,77 @@
 import Phaser from 'phaser';
 
-export class CharacterSelectScene extends Phaser.Scene {
+import { texto, boton } from '../ui/ui.js';
+import { PECES, CLAVE_PEZ } from '../data/peces.js';
+
+// Pantalla para escoger el pez antes de jugar.
+// Se escoge con clic/toque, o con flechas ← → y Enter.
+export class SeleccionPez extends Phaser.Scene {
     constructor() {
-        super('CharacterSelectScene');
+        super('SeleccionPez');
     }
 
     create() {
-        this.add.text(this.scale.width / 2, 80, 'ELIGE TU PEZ', {
-            fontSize: '32px',
-            fill: '#ffffff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
+        texto(this, 480, 50, 'Escoge tu pez', 38);
 
-        const fishes = [
-            { id: 'fish_blue', name: 'Azul Veloz', power: 'Velocidad x2', color: '#00f' },
-            { id: 'fish_orange', name: 'Naranja Explosivo', power: 'Super Rebote', color: '#f80' },
-            { id: 'fish_pink', name: 'Rosa Ligero', power: 'Gravedad Baja', color: '#f0f' }
-        ];
+        // Si ya había uno escogido antes, empieza marcado
+        const anterior = PECES.findIndex((p) => p.id === this.registry.get(CLAVE_PEZ));
+        this.indice = anterior >= 0 ? anterior : 0;
+        this.tarjetas = [];
 
-        let startX = this.scale.width / 2 - 200;
+        PECES.forEach((pez, i) => {
+            const x = 150 + i * 220;
+            const y = 260;
 
-        fishes.forEach((fish, index) => {
-            let container = this.add.container(startX + (index * 200), 300);
+            const fondo = this.add.rectangle(x, y, 196, 270, 0x126481)
+                .setStrokeStyle(2, 0x72d4e4)
+                .setInteractive({ useHandCursor: true });
 
-            let bg = this.add.rectangle(0, 0, 150, 200, 0x222222)
-                .setInteractive()
-                .setStrokeStyle(2, 0xffffff);
+            const imagen = this.add.image(x, y - 75, pez.textura).setScale(1.1);
+            texto(this, x, y + 5, pez.nombre, 24);
+            this.add.text(x, y + 40, pez.poderNombre, {
+                fontFamily: 'system-ui, sans-serif',
+                fontSize: '17px',
+                color: '#f9ed69',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            this.add.text(x, y + 82, pez.descripcion, {
+                fontFamily: 'system-ui, sans-serif',
+                fontSize: '14px',
+                color: '#bfefff',
+                align: 'center'
+            }).setOrigin(0.5);
 
-            let sprite = this.add.sprite(0, -30, fish.id);
-            let nameText = this.add.text(0, 40, fish.name, { fontSize: '14px', color: '#fff' }).setOrigin(0.5);
-            let powerText = this.add.text(0, 70, `Poder: ${fish.power}`, { fontSize: '10px', color: '#ff0' }).setOrigin(0.5);
-
-            container.add([bg, sprite, nameText, powerText]);
-
-            // Al hacer clic, guardamos el pez seleccionado y comenzamos el juego
-            bg.on('pointerdown', () => {
-                this.registry.set('selectedFish', fish);
-                this.scene.start('GameScene');
-            });
+            fondo.on('pointerup', () => this.seleccionar(i));
+            this.tarjetas.push({ fondo, imagen });
         });
+
+        boton(this, 480, 460, '¡A nadar!', () => this.empezar());
+        texto(this, 480, 512, '← → para elegir · Enter para jugar', 14).setAlpha(0.7);
+
+        this.input.keyboard.on('keydown-LEFT', () => this.seleccionar((this.indice + PECES.length - 1) % PECES.length));
+        this.input.keyboard.on('keydown-RIGHT', () => this.seleccionar((this.indice + 1) % PECES.length));
+        this.input.keyboard.on('keydown-ENTER', () => this.empezar());
+
+        this.seleccionar(this.indice);
+    }
+
+    seleccionar(i) {
+        this.indice = i;
+        this.tarjetas.forEach(({ fondo, imagen }, j) => {
+            const elegido = j === i;
+            fondo.setFillStyle(elegido ? 0x237d9a : 0x126481);
+            fondo.setStrokeStyle(elegido ? 4 : 2, elegido ? 0xf9ed69 : 0x72d4e4);
+            this.tweens.killTweensOf(imagen);
+            imagen.setAngle(0);
+            if (elegido) {
+                // El pez escogido se mueve un poquito
+                this.tweens.add({ targets: imagen, angle: 8, duration: 300, yoyo: true, repeat: -1 });
+            }
+        });
+    }
+
+    empezar() {
+        this.registry.set(CLAVE_PEZ, PECES[this.indice].id);
+        this.scene.start('Game');
     }
 }
