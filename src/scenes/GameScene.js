@@ -10,9 +10,9 @@ export class GameScene extends Phaser.Scene {
     preload() {
         const assets = import.meta.env.BASE_URL + 'assets/images/'; // misma ruta que usa la persona 1
         this.load.image('fish_orange', assets + 'fish_orange.png');
-        this.load.image('fish_blue', assets + 'fish_blue.png');
-        this.load.image('fish_green', assets + 'fish_green.png');
-        this.load.image('fish_red', assets + 'fish_red.png');
+        this.load.image('fish_blue_skeleton_outline', assets + 'fish_blue_skeleton_outline.png');
+        this.load.image('fish_green_skeleton_outline', assets + 'fish_green_skeleton_outline.png');
+        this.load.image('fish_red_skeleton_outline', assets + 'fish_red_skeleton_outline.png');
         this.load.image('bubble_a', assets + 'bubble_a.png');
         this.load.image('bubble_c', assets + 'bubble_c.png');
     }
@@ -195,7 +195,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     spawnEnemy() {
-        const textures = ['fish_blue', 'fish_green', 'fish_red'];
+        const textures = ['fish_blue_skeleton_outline', 'fish_green_skeleton_outline', 'fish_red_skeleton_outline'];
         const texture = textures[(this.spawnedThisWave + this.currentWave - 1) % textures.length];
         const x = this.scale.width - 45;
         const y = Phaser.Math.Between(90, this.scale.height - 150);
