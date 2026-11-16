@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 
+import { leerProgreso } from '../data/progreso.js';
 import { texto, boton } from './ui.js';
 
 export class Inicio extends Phaser.Scene {
@@ -39,7 +40,11 @@ export class Menu extends Phaser.Scene {
   create() {
     this.add.image(480, 118, 'pez').setScale(1.4);
     texto(this, 480, 218, 'Angry Fins', 52);
-    boton(this, 480, 310, 'Jugar', () => this.scene.start('SeleccionPez'));
+    const progreso = leerProgreso();
+    if (progreso.nivel > 0) {
+      texto(this, 480, 270, `Récord: ${progreso.puntaje}  |  Nivel máximo: ${progreso.nivel}`, 20);
+    }
+    boton(this, 480, 335, 'Jugar', () => this.scene.start('SeleccionPez'));
   }
 }
 
@@ -78,11 +83,14 @@ class Resultado extends Phaser.Scene {
     this.titulo = titulo;
   }
 
-  create() {
-    texto(this, 480, 154, this.titulo, 50);
-    boton(this, 480, 246, 'Volver a jugar', () => this.scene.start('Game'));
-    boton(this, 480, 304, 'Cambiar pez', () => this.scene.start('SeleccionPez'));
-    boton(this, 480, 362, 'Menú principal', () => this.scene.start('Menu'));
+  create(resultado) {
+    texto(this, 480, 105, this.titulo, 50);
+    texto(this, 480, 170, `Puntaje final: ${resultado.puntaje}  |  Nivel alcanzado: ${resultado.nivel}`, 22);
+    const etiqueta = resultado.nuevoRecord ? '¡Nuevo récord!' : 'Récord:';
+    texto(this, 480, 208, `${etiqueta} ${resultado.record}`, 20);
+    boton(this, 480, 278, 'Volver a jugar', () => this.scene.start('Game'));
+    boton(this, 480, 336, 'Cambiar pez', () => this.scene.start('SeleccionPez'));
+    boton(this, 480, 394, 'Menú principal', () => this.scene.start('Menu'));
   }
 }
 

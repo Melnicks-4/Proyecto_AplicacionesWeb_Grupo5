@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { CorrienteMarina } from '../managers/CorrienteMarina.js';
+import { guardarResultado } from '../data/progreso.js';
 import { AudioManager } from '../audio/AudioManager.js';
 import { PoderManager } from '../managers/PoderManager.js';
 import { CLAVE_PEZ, obtenerPez } from '../data/peces.js';
@@ -66,6 +68,7 @@ export class GameScene extends Phaser.Scene {
         this.pointsPerEnemy = 100;
         this.currentWave = 0;
         this.score = 0;
+        this.resultadoPendiente = false;
         this.spawnedThisWave = 0;
         this.isRoundTransitioning = false;
         this.pez = obtenerPez(this.registry.get(CLAVE_PEZ));
@@ -205,21 +208,25 @@ export class GameScene extends Phaser.Scene {
         }).setDepth(10);
 
         this.actualizarEstado();
+        this.corriente = new CorrienteMarina(this);
         this.startWave();
     }
 
-    update(time) {
+    update(time, delta) {
         if (this.lives <= 0) return;
+
+        const empuje = this.currentWave === 2 && !this.isRoundTransitioning
+            ? this.corriente.actualizar(delta) : 0;
 
         // Movimiento horizontal
         if (this.cursors.left.isDown || this.touchState.left) {
-            this.player.setVelocityX(-this.pez.velocidad);
+            this.player.setVelocityX(-this.pez.velocidad + empuje);
             this.player.setFlipX(true); // voltea el pez a la izquierda
         } else if (this.cursors.right.isDown || this.touchState.right) {
-            this.player.setVelocityX(this.pez.velocidad);
+            this.player.setVelocityX(this.pez.velocidad + empuje);
             this.player.setFlipX(false); // voltea el pez a la derecha
         } else {
-            this.player.setVelocityX(0);
+            this.player.setVelocityX(empuje);
         }
 
         // Impulso de natación hacia arriba
@@ -237,6 +244,9 @@ export class GameScene extends Phaser.Scene {
 
         // Reciclar burbujas que salen de la pantalla
         this.bubbles.getChildren().forEach((bubble) => {
+            if (bubble.active && bubble.body.enable) {
+                bubble.setVelocityX(bubble.velocidadBaseX + empuje);
+            }
             if (bubble.active && (
                 bubble.x > this.scale.width + 40 ||
                 bubble.x < -40 ||
@@ -350,11 +360,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     finishWave() {
+        this.corriente.detener();
         this.isRoundTransitioning = true;
 
         if (this.currentWave === this.totalWaves) {
             this.events.emit('player-won', this.score);
-            this.time.delayedCall(1000, () => this.scene.start('Victoria'));
+            this.mostrarResultado('Victoria', 1000);
             return;
         }
 
@@ -385,7 +396,8 @@ export class GameScene extends Phaser.Scene {
         }
 
         const direction = this.player.flipX ? -1 : 1;
-        bubble.setVelocity(450 * direction, velocidadY);
+        bubble.velocidadBaseX = 450 * direction;
+        bubble.setVelocity(bubble.velocidadBaseX, velocidadY);
 
         this.audioManager.play('bubble');
         this.events.emit('player-shoot'); // la persona 4 conecta el sonido
@@ -506,12 +518,20 @@ export class GameScene extends Phaser.Scene {
         });
 
         if (this.lives === 0) {
+            this.corriente.detener();
             this.player.setVelocityX(0);
             this.events.emit('player-dead');
             // Flujo: sin vidas → pantalla de Game Over (escena 'Derrota' de la persona 1)
-            this.time.delayedCall(800, () => this.scene.start('Derrota'));
+            this.mostrarResultado('Derrota', 800);
         }
 
+    }
+
+    mostrarResultado(escena, espera) {
+        if (this.resultadoPendiente) return;
+        this.resultadoPendiente = true;
+        const resultado = guardarResultado(this.score, this.currentWave);
+        this.time.delayedCall(espera, () => this.scene.start(escena, resultado));
     }
 
     actualizarEstado() {
