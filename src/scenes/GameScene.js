@@ -6,7 +6,7 @@ import { PoderManager } from '../managers/PoderManager.js';
 import { CLAVE_PEZ, obtenerPez } from '../data/peces.js';
 import { ALTO_SUELO, crearSuelo } from '../objects/suelo.js';
 import bubbleAudioUrl from '../audio/bubble.mp3';
-import oceanAudioUrl from '../audio/Ocean.ogg';
+import oceanAudioUrl from '../audio/Ocean.mp3';
 import powerUpAudioUrl from '../audio/power_up.mp3';
 
 export class GameScene extends Phaser.Scene {
