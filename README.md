@@ -50,6 +50,10 @@ Cada enemigo normal suma **100 puntos** y el jefe suma **1000**. Las pantallas *
 - La música y los efectos se pueden silenciar desde el menú o durante la partida. La preferencia se conserva al recargar la página mediante `localStorage`.
 - El navegador también guarda el récord de puntaje y el nivel máximo alcanzado.
 
+## Rendimiento
+
+En una prueba local de escritorio, el medidor FPS de DevTools de Chromium mostró **144 FPS**. El resultado puede variar según el equipo, la pantalla y el navegador; falta medirlo en móvil.
+
 ## Estructura del proyecto
 
 El juego usa HTML, CSS y JavaScript con Phaser 4 y Arcade Physics. Vite sirve y compila el proyecto.
