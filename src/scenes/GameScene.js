@@ -1,4 +1,8 @@
 import Phaser from 'phaser';
+import { AudioManager } from '../audio/AudioManager.js';
+import bubbleAudioUrl from '../audio/bubble.mp3';
+import oceanAudioUrl from '../audio/Ocean.ogg';
+import powerUpAudioUrl from '../audio/power_up.mp3';
 
 export class GameScene extends Phaser.Scene {
     constructor() {
@@ -16,6 +20,9 @@ export class GameScene extends Phaser.Scene {
         this.load.image('bubble_a', assets + 'bubble_a.png');
         this.load.image('bubble_b', assets + 'bubble_b.png');
         this.load.image('bubble_c', assets + 'bubble_c.png');
+        this.load.audio('bubble', bubbleAudioUrl);
+        this.load.audio('ocean', oceanAudioUrl);
+        this.load.audio('power_up', powerUpAudioUrl);
     }
 
     create() {
@@ -46,6 +53,21 @@ export class GameScene extends Phaser.Scene {
         this.score = 0;
         this.spawnedThisWave = 0;
         this.isRoundTransitioning = false;
+        this.audioManager = new AudioManager(this);
+
+        const oceanMusic = this.sound.add('ocean', { loop: true, volume: 0.35 });
+        this.oceanMusic = oceanMusic;
+        const pauseMusic = () => oceanMusic.pause();
+        const resumeMusic = () => oceanMusic.resume();
+        this.events.on('pause', pauseMusic);
+        this.events.on('resume', resumeMusic);
+        this.events.once('shutdown', () => {
+            this.events.off('pause', pauseMusic);
+            this.events.off('resume', resumeMusic);
+            oceanMusic.stop();
+            oceanMusic.destroy();
+        });
+        oceanMusic.play();
 
         // 2. Texturas temporales (se usan solo si el sprite real no está cargado)
         this.createTempTextures();
@@ -71,10 +93,9 @@ export class GameScene extends Phaser.Scene {
 
         // 5. Grupo de disparos (burbujas)
         const bubbleKey = this.textures.exists('bubble_a') ? 'bubble_a' : 'tempBubble';
-        const bubbleKey2 = this.textures.exists('bubble_b') ? 'bubble_b' : 'tempBubble';
+
         this.bubbles = this.physics.add.group({
             defaultKey: bubbleKey,
-            defaultKey2: bubbleKey2,
             maxSize: 30
         });
 
@@ -107,6 +128,21 @@ export class GameScene extends Phaser.Scene {
             .setInteractive()
             .on('pointerdown', () => this.pauseGame());
         this.add.text(W - 40, 40, '||', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.circle(W - 95, 40, 20, 0xffffff, 0.25)
+            .setInteractive()
+            .on('pointerdown', () => {
+                const soundEnabled = this.audioManager.toggleSound();
+                this.soundButtonText.setText(soundEnabled ? '🔊' : '🔇');
+            });
+        this.soundButtonText = this.add.text(
+            W - 95,
+            40,
+            this.audioManager.soundEnabled ? '🔊' : '🔇',
+            {
+                fontSize: '18px',
+                color: '#ffffff'
+            }
+        ).setOrigin(0.5);
 
         // 10. Interfaz de pruebas (la persona 4 hará el HUD final)
         this.statusText = this.add.text(20, 20, `Vidas: ${this.lives} | Disparo: Normal`, {
@@ -243,6 +279,7 @@ export class GameScene extends Phaser.Scene {
         const direction = this.player.flipX ? -1 : 1;
         bubble.setVelocity(450 * direction, -20);
 
+        this.audioManager.play('bubble');
         this.events.emit('player-shoot'); // la persona 4 conecta el sonido
     }
 
@@ -270,6 +307,7 @@ export class GameScene extends Phaser.Scene {
     collectPowerUp(player, powerUp) {
         powerUp.destroy();
         this.hasRapidFire = true;
+        this.audioManager.play('power_up');
         this.events.emit('powerup-collected'); // sonido (persona 4) y efectos (persona 3)
         this.statusText.setText(`Vidas: ${this.lives} | Disparo: RÁPIDO (Power-up activo)`);
 
