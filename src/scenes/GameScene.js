@@ -14,6 +14,7 @@ export class GameScene extends Phaser.Scene {
         this.load.image('fish_green_skeleton_outline', assets + 'fish_green_skeleton_outline.png');
         this.load.image('fish_red_skeleton_outline', assets + 'fish_red_skeleton_outline.png');
         this.load.image('bubble_a', assets + 'bubble_a.png');
+        this.load.image('bubble_b', assets + 'bubble_b.png');
         this.load.image('bubble_c', assets + 'bubble_c.png');
     }
 
@@ -69,10 +70,11 @@ export class GameScene extends Phaser.Scene {
         this.physics.add.collider(this.player, this.platforms);
 
         // 5. Grupo de disparos (burbujas)
-        // *** AQUÍ VA EL NOMBRE DEL SPRITE DE LA BURBUJA ***
         const bubbleKey = this.textures.exists('bubble_a') ? 'bubble_a' : 'tempBubble';
+        const bubbleKey2 = this.textures.exists('bubble_b') ? 'bubble_b' : 'tempBubble';
         this.bubbles = this.physics.add.group({
             defaultKey: bubbleKey,
+            defaultKey2: bubbleKey2,
             maxSize: 30
         });
 
@@ -231,10 +233,10 @@ export class GameScene extends Phaser.Scene {
         // Reactiva el cuerpo físico y lo coloca en el pez
         bubble.enableBody(true, this.player.x, this.player.y, true, true);
         bubble.body.setAllowGravity(false);
+        bubble.setScale(0.5);
 
-        // El aro de bubble_a es pequeño: se agranda y su colisión se ajusta al aro
+        // Ajusta la colisión del aro de bubble_a
         if (bubble.texture.key === 'bubble_a') {
-            bubble.setScale(2);
             bubble.body.setCircle(8, 24, 24);
         }
 
@@ -280,8 +282,17 @@ export class GameScene extends Phaser.Scene {
     }
 
     onBubbleHitEnemy(bubble, enemy) {
-        if (!enemy.active) return;
-        bubble.disableBody(true, true);
+        if (!enemy.active || !bubble.body.enable) return;
+        bubble.body.enable = false;
+        bubble.setVelocity(0, 0);
+        this.tweens.add({
+            targets: bubble,
+            scaleX: 2,
+            scaleY: 2,
+            duration: 250,
+            ease: 'Quad.Out',
+            onComplete: () => bubble.disableBody(true, true)
+        });
         enemy.destroy();
         this.score += this.pointsPerEnemy;
         this.scoreText.setText(`Puntaje: ${this.score}`);
