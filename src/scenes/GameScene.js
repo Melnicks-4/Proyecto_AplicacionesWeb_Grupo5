@@ -1,4 +1,6 @@
+import { crearTunelCoral } from '../objects/tunelCoral.js';
 import Phaser from 'phaser';
+import { TormentaMarina } from '../managers/TormentaMarina.js';
 import { CorrienteMarina } from '../managers/CorrienteMarina.js';
 import { guardarResultado } from '../data/progreso.js';
 import { AudioManager } from '../audio/AudioManager.js';
@@ -54,12 +56,17 @@ export class GameScene extends Phaser.Scene {
             this.add.tileSprite(0, 0, W, H, 'fondo-marino').setOrigin(0).setDepth(0);
         }
 
+        this.oscuridad = this.add.rectangle(0, 0, W, H, 0x04152e, 0.65)
+            .setOrigin(0).setDepth(2.5).setVisible(false);
+
         if (this.textures.exists('alga')) {
             [80, 330, 600, 860].forEach((x) => {
                 this.add.image(x, H - ALTO_SUELO, 'alga').setOrigin(0.5, 1).setDepth(2);
             });
         }
         this.lives = 3;
+        this.perdioVidas = false;
+        this.exploroTunel = false;
         this.lastFired = 0;
         this.invulnerable = false;   // evita perder varias vidas de golpe
         this.totalWaves = 3;
@@ -67,6 +74,7 @@ export class GameScene extends Phaser.Scene {
         this.enemiesInCurrentWave = 0;
         this.pointsPerEnemy = 100;
         this.currentWave = 0;
+        this.retirarTunel = null;
         this.boss = null;
         this.score = 0;
         this.resultadoPendiente = false;
@@ -104,6 +112,8 @@ export class GameScene extends Phaser.Scene {
             this.player.setScale(0.8);
             this.player.body.setSize(80, 44).setOffset(24, 42);
         }
+        this.escudoExtra = this.add.circle(this.player.x, this.player.y, 43, 0x78fccc, 0.12)
+            .setStrokeStyle(3, 0x8effdc).setDepth(4).setVisible(false);
         this.player.setCollideWorldBounds(true);
         this.player.setBounce(0.2);
         this.physics.add.collider(this.player, this.platforms);
@@ -124,6 +134,21 @@ export class GameScene extends Phaser.Scene {
 
         // Colisión de recolección (overlap)
         this.physics.add.overlap(this.player, this.powerUps, this.collectPowerUp, null, this);
+        this.vidasExtra = this.physics.add.group();
+        this.physics.add.overlap(this.player, this.vidasExtra, (player, burbuja) => {
+            if (this.lives <= 0 || (this.lives === 3 && this.escudoExtra.visible)) return;
+
+            burbuja.etiqueta.destroy();
+            burbuja.destroy();
+            if (this.lives < 3) {
+                this.lives += 1;
+                this.actualizarEstado();
+                this.events.emit('lives-changed', this.lives);
+            } else {
+                this.escudoExtra.setPosition(player.x, player.y).setVisible(true);
+            }
+            this.audioManager.play('power_up');
+        });
 
         // 7. Enemigos y colisiones
         this.enemies = this.physics.add.group();
@@ -211,6 +236,7 @@ export class GameScene extends Phaser.Scene {
         this.createMinimap();
         this.actualizarEstado();
         this.corriente = new CorrienteMarina(this);
+        this.tormenta = new TormentaMarina(this);
         this.startWave();
     }
 
@@ -221,11 +247,18 @@ export class GameScene extends Phaser.Scene {
             this.drawMinimap();
             this.nextMinimapUpdate = time + 100;
         }
+        if (this.escudoExtra.visible) this.escudoExtra.setPosition(this.player.x, this.player.y);
 
         if (this.boss?.active) this.actualizarDisparosJefe();
 
-        const empuje = this.currentWave === 2 && !this.isRoundTransitioning
-            ? this.corriente.actualizar(delta) : 0;
+        const jefeEnSegundaFase = this.boss?.active && this.boss.health <= this.boss.maxHealth / 2;
+        const hayMarea = !this.isRoundTransitioning && (this.currentWave === 1 || jefeEnSegundaFase);
+        const hayTormenta = !this.isRoundTransitioning && (this.currentWave === 2 || jefeEnSegundaFase);
+        const empuje = hayMarea ? this.corriente.actualizar(delta) : 0;
+        if (hayTormenta && this.tormenta.actualizar(delta)) {
+            this.recibirGolpeAmbiental();
+            if (this.lives <= 0) return;
+        }
 
         // Movimiento horizontal
         if (this.cursors.left.isDown || this.touchState.left) {
@@ -268,10 +301,14 @@ export class GameScene extends Phaser.Scene {
 
         this.enemies.getChildren().forEach((enemy) => {
             if (!enemy.active) return;
+            if (!enemy.isBoss) {
+                this.moverEnemigo(enemy, delta);
+                return;
+            }
             const direction = this.player.x < enemy.x ? -1 : 1;
-            const cargando = enemy.isBoss && enemy.inflado;
+            const cargando = enemy.inflado;
             enemy.setVelocityX(cargando ? 0 : direction * enemy.moveSpeed);
-            if (enemy.isBoss) enemy.setVelocityY(cargando ? 0 : Math.sin(time / 450) * 45);
+            enemy.setVelocityY(cargando ? 0 : Math.sin(time / 450) * 45);
             enemy.setFlipX(direction < 0);
         });
 
@@ -347,6 +384,8 @@ export class GameScene extends Phaser.Scene {
 
     startWave() {
         this.currentWave += 1;
+        this.oscuridad.setVisible(this.currentWave === 2);
+        this.crearBurbujaDeVida();
         this.spawnedThisWave = 0;
         this.waveText.setText(`Nivel: ${this.currentWave}/${this.totalWaves}`);
         this.events.emit('wave-changed', this.currentWave, this.totalWaves);
@@ -354,6 +393,8 @@ export class GameScene extends Phaser.Scene {
         if (this.currentWave > 1) {
             this.spawnPowerUp(Phaser.Math.Between(250, 700), Phaser.Math.Between(150, 350));
         }
+
+        if (this.currentWave === 2) this.retirarTunel = crearTunelCoral(this);
 
         if (this.currentWave === this.totalWaves) {
             this.enemiesInCurrentWave = 1;
@@ -411,11 +452,7 @@ export class GameScene extends Phaser.Scene {
         this.disparosJefe = this.physics.add.group({ defaultKey: 'bubble_b', maxSize: 15 });
         this.physics.add.overlap(this.player, this.disparosJefe, (player, disparo) => {
             disparo.disableBody(true, true);
-            if (!this.invulnerable && !this.poderManager.tieneEscudo()) {
-                this.invulnerable = true;
-                this.takeDamage();
-                this.time.delayedCall(1000, () => { this.invulnerable = false; });
-            }
+            this.recibirGolpeAmbiental();
         });
         this.abrirVentanaJefe(boss);
     }
@@ -486,11 +523,63 @@ export class GameScene extends Phaser.Scene {
         enemy.body.setAllowGravity(false);
         enemy.setCollideWorldBounds(true);
         enemy.moveSpeed = 75 + (this.currentWave - 1) * 35;
+        enemy.patron = ['patrulla', 'zigzag', 'persecucion'][this.spawnedThisWave % 3];
+        enemy.direccion = -1;
+        enemy.tiempoNado = Phaser.Math.Between(0, 1000);
         this.spawnedThisWave += 1;
     }
 
+    moverEnemigo(enemy, delta) {
+        enemy.tiempoNado += delta;
+        const margen = 45;
+        const fondo = this.scale.height - 120;
+        if (enemy.x <= margen) enemy.direccion = 1;
+        if (enemy.x >= this.scale.width - margen) enemy.direccion = -1;
+
+        let velocidadY = 0;
+        if (enemy.patron === 'zigzag') {
+            velocidadY = Math.sin(enemy.tiempoNado / 260) * 95;
+        }
+
+        const buscando = enemy.patron === 'persecucion' && enemy.tiempoNado % 3200 < 1250;
+        let velocidadX = enemy.direccion * enemy.moveSpeed;
+        if (buscando && Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) < 260) {
+            velocidadX = Phaser.Math.Clamp(this.player.x - enemy.x, -enemy.moveSpeed, enemy.moveSpeed);
+            velocidadY = Phaser.Math.Clamp(this.player.y - enemy.y, -70, 70);
+        }
+
+        if ((enemy.y <= 95 && velocidadY < 0) || (enemy.y >= fondo && velocidadY > 0)) {
+            velocidadY = 0;
+        }
+        enemy.setVelocity(velocidadX, velocidadY);
+        if (velocidadX !== 0) enemy.setFlipX(velocidadX < 0);
+    }
+
+    crearBurbujaDeVida() {
+        const x = this.currentWave === 2 ? 570 : 330;
+        const y = 275;
+        const burbuja = this.vidasExtra.create(x, y, 'bubble_b');
+        burbuja.setScale(0.34).setTint(0x9affbf).setDepth(5);
+        burbuja.body.setAllowGravity(false);
+        burbuja.etiqueta = this.add.text(x, y, '+', {
+            fontFamily: 'Arial',
+            fontSize: '24px',
+            fontStyle: 'bold',
+            color: '#aaffc8',
+            stroke: '#093226',
+            strokeThickness: 4
+        }).setOrigin(0.5).setDepth(6);
+    }
+
     finishWave() {
+        for (const burbuja of this.vidasExtra.getChildren()) {
+            burbuja.etiqueta.destroy();
+        }
+        this.vidasExtra.clear(true, true);
+        this.retirarTunel?.();
+        this.retirarTunel = null;
         this.corriente.detener();
+        this.tormenta.detener();
         this.isRoundTransitioning = true;
 
         if (this.currentWave === this.totalWaves) {
@@ -553,9 +642,12 @@ export class GameScene extends Phaser.Scene {
             yoyo: true,
             repeat: -1
         });
+        return powerUp;
     }
 
     collectPowerUp(player, powerUp) {
+        if (powerUp.esPremioDelTunel) this.exploroTunel = true;
+        this.tweens.killTweensOf(powerUp);
         powerUp.destroy();
         this.poderManager.activar();
         this.audioManager.play('power_up');
@@ -623,7 +715,7 @@ export class GameScene extends Phaser.Scene {
         this.events.emit('enemy-hit', enemy);
     }
 
-    // Choque con enemigo: pierde una vida y queda protegido 1 segundo
+    // Choque con enemigo: pierde una vida y queda protegido durante el parpadeo
     onPlayerHitEnemy(player, enemy) {
         if (this.poderManager.tieneEscudo()) {
             if (enemy.isBoss) {
@@ -636,27 +728,49 @@ export class GameScene extends Phaser.Scene {
         if (this.invulnerable) return;
         this.invulnerable = true;
         this.takeDamage();
-        this.time.delayedCall(1000, () => { this.invulnerable = false; });
+        this.time.delayedCall(1500, () => { this.invulnerable = false; });
+    }
+
+    recibirGolpeAmbiental() {
+        if (this.invulnerable || this.poderManager.tieneEscudo()) return;
+        this.invulnerable = true;
+        this.takeDamage();
+        this.time.delayedCall(1500, () => { this.invulnerable = false; });
     }
 
     // Resta una vida y avisa a los demás módulos
     takeDamage() {
         if (this.lives <= 0) return;
-        this.lives -= 1;
-        this.events.emit('lives-changed', this.lives); // para el HUD (persona 4)
+        const golpeBloqueado = this.escudoExtra.visible;
+        if (golpeBloqueado) {
+            this.escudoExtra.setVisible(false);
+        } else {
+            this.lives -= 1;
+            this.perdioVidas = true;
+            this.actualizarEstado();
+            this.events.emit('lives-changed', this.lives);
+        }
 
-        this.actualizarEstado();
-
+        const impacto = this.add.circle(this.player.x, this.player.y, 24)
+            .setStrokeStyle(4, golpeBloqueado ? 0x8effdc : 0xffab84).setDepth(7);
+        this.tweens.add({
+            targets: impacto,
+            scale: 2.4,
+            alpha: 0,
+            duration: 280,
+            onComplete: () => impacto.destroy()
+        });
         this.tweens.add({
             targets: this.player,
-            alpha: 0.3,
-            duration: 100,
+            alpha: 0.4,
+            duration: 125,
             yoyo: true,
-            repeat: 3
+            repeat: 5
         });
 
         if (this.lives === 0) {
             this.corriente.detener();
+            this.tormenta.detener();
             this.player.setVelocityX(0);
             this.events.emit('player-dead');
             // Flujo: sin vidas → pantalla de Game Over (escena 'Derrota' de la persona 1)
@@ -669,6 +783,11 @@ export class GameScene extends Phaser.Scene {
         if (this.resultadoPendiente) return;
         this.resultadoPendiente = true;
         const resultado = guardarResultado(this.score, this.currentWave);
+        if (escena === 'Victoria') {
+            resultado.medallas = [];
+            if (!this.perdioVidas) resultado.medallas.push('Intocable');
+            if (this.exploroTunel) resultado.medallas.push('Explorador');
+        }
         this.time.delayedCall(espera, () => this.scene.start(escena, resultado));
     }
 
