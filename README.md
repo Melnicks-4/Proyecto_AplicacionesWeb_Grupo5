@@ -23,7 +23,7 @@ Pulsa **Jugar** en el menú y escoge un pez antes de comenzar. Desde la pausa pu
 - `src/scenes/GameScene.js` contiene la escena de partida.
 - `public/assets/` contiene los sprites y su licencia.
 
-La partida tiene tres oleadas de cinco enemigos. Los enemigos aparecen por la derecha y persiguen horizontalmente al jugador; cada oleada aumenta su velocidad. Cada enemigo eliminado suma 100 puntos. Se gana al completar las tres oleadas y se pierde al quedarse sin las tres vidas. Al recoger un power-up, se activa durante seis segundos la habilidad especial del pez escogido.
+La partida tiene tres niveles: el primero incluye cinco enemigos, el segundo siete enemigos más rápidos y el tercero un jefe pez globo con barra de vida. Cada enemigo normal eliminado suma 100 puntos y derrotar al jefe suma 1000. Se gana al derrotar al jefe y se pierde al quedarse sin las tres vidas. Al recoger un power-up, se activa durante seis segundos la habilidad especial del pez escogido.
 
 ## Verificación
 
