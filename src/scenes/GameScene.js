@@ -29,6 +29,9 @@ export class GameScene extends Phaser.Scene {
         ].forEach(([key, file]) => {
             if (!this.textures.exists(key)) this.load.image(key, assets + file);
         });
+        if (!this.textures.exists('pufferBoss')) {
+            this.load.image('pufferBoss', assets + 'fish_brown_outline.png');
+        }
         this.load.image('fish_blue_skeleton_outline', assets + 'fish_blue_skeleton_outline.png');
         this.load.image('fish_green_skeleton_outline', assets + 'fish_green_skeleton_outline.png');
         this.load.image('fish_red_skeleton_outline', assets + 'fish_red_skeleton_outline.png');
@@ -285,7 +288,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     spawnBoss() {
-        this.createPufferBossTexture();
         const boss = this.enemies.create(this.scale.width - 130, this.scale.height / 2, 'pufferBoss');
         boss.setScale(2).setDepth(3);
         boss.body.setSize(72, 68).setOffset(28, 30);
@@ -599,47 +601,4 @@ export class GameScene extends Phaser.Scene {
         g.destroy();
     }
 
-    createPufferBossTexture() {
-        if (this.textures.exists('pufferBoss')) return;
-
-        const graphics = this.make.graphics({ add: false });
-        const centerX = 64;
-        const centerY = 64;
-
-        graphics.fillStyle(0xc9792b, 1);
-        for (let i = 0; i < 16; i += 1) {
-            const angle = (i / 16) * Math.PI * 2;
-            const baseRadius = 36;
-            const tipRadius = 59;
-            const halfWidth = 8;
-            const baseX = centerX + Math.cos(angle) * baseRadius;
-            const baseY = centerY + Math.sin(angle) * baseRadius;
-            const sideX = -Math.sin(angle) * halfWidth;
-            const sideY = Math.cos(angle) * halfWidth;
-            const tipX = centerX + Math.cos(angle) * tipRadius;
-            const tipY = centerY + Math.sin(angle) * tipRadius;
-            graphics.fillTriangle(
-                baseX - sideX, baseY - sideY,
-                baseX + sideX, baseY + sideY,
-                tipX, tipY
-            );
-        }
-
-        graphics.fillStyle(0xf4b942, 1);
-        graphics.fillCircle(centerX, centerY, 40);
-        graphics.lineStyle(4, 0x9c5b12, 1);
-        graphics.strokeCircle(centerX, centerY, 40);
-        graphics.fillStyle(0xf8d889, 1);
-        graphics.fillEllipse(64, 77, 48, 28);
-        graphics.fillStyle(0xffffff, 1);
-        graphics.fillCircle(77, 51, 8);
-        graphics.fillCircle(77, 70, 8);
-        graphics.fillStyle(0x1f2937, 1);
-        graphics.fillCircle(80, 52, 3);
-        graphics.fillCircle(80, 71, 3);
-        graphics.lineStyle(4, 0x7a3418, 1);
-        graphics.lineBetween(76, 88, 88, 86);
-        graphics.generateTexture('pufferBoss', 128, 128);
-        graphics.destroy();
-    }
 }
