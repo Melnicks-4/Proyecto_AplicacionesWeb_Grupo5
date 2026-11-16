@@ -88,15 +88,18 @@ class Resultado extends Phaser.Scene {
     texto(this, 480, 170, `Puntaje final: ${resultado.puntaje}  |  Nivel alcanzado: ${resultado.nivel}`, 22);
     const etiqueta = resultado.nuevoRecord ? '¡Nuevo récord!' : 'Récord:';
     texto(this, 480, 208, `${etiqueta} ${resultado.record}`, 20);
-    boton(this, 480, 278, 'Volver a jugar', () => this.scene.start('Game'));
-    boton(this, 480, 336, 'Cambiar pez', () => this.scene.start('SeleccionPez'));
-    boton(this, 480, 394, 'Menú principal', () => this.scene.start('Menu'));
+    if (resultado.medallas?.length) {
+      texto(this, 480, 244, `Medallas: ${resultado.medallas.join(' · ')}`, 19).setColor('#ffe19a');
+    }
+    boton(this, 480, 300, 'Volver a jugar', () => this.scene.start('Game'));
+    boton(this, 480, 358, 'Cambiar pez', () => this.scene.start('SeleccionPez'));
+    boton(this, 480, 416, 'Menú principal', () => this.scene.start('Menu'));
   }
 }
 
 export class Victoria extends Resultado {
   constructor() {
-    super('Victoria', '¡Victoria!');
+    super('Victoria', 'GAME WINNER');
   }
 }
 
