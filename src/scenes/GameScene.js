@@ -59,6 +59,7 @@ export class GameScene extends Phaser.Scene {
         this.invulnerable = false;   // evita perder varias vidas de golpe
         this.totalWaves = 3;
         this.enemiesPerWave = 5;
+        this.enemiesInCurrentWave = 0;
         this.pointsPerEnemy = 100;
         this.currentWave = 0;
         this.score = 0;
@@ -138,7 +139,13 @@ export class GameScene extends Phaser.Scene {
             .setDepth(10)
             .setInteractive()
             .on('pointerdown', () => this.pauseGame());
-        this.add.text(W - 40, 40, '||', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' })
+        this.add.text(W - 40, 40, '||', {
+            fontSize: '18px',
+            color: '#000000',
+            stroke: '#ffffff',
+            strokeThickness: 2,
+            fontStyle: 'bold'
+        })
             .setOrigin(0.5)
             .setDepth(10);
         this.add.circle(W - 95, 40, 20, 0xffffff, 0.25)
@@ -154,7 +161,9 @@ export class GameScene extends Phaser.Scene {
             this.audioManager.soundEnabled ? '🔊' : '🔇',
             {
                 fontSize: '18px',
-                color: '#ffffff'
+                color: '#000000',
+                stroke: '#ffffff',
+                strokeThickness: 2
             }
         ).setOrigin(0.5).setDepth(10);
 
@@ -162,26 +171,34 @@ export class GameScene extends Phaser.Scene {
         this.statusText = this.add.text(20, 20, `Vidas: ${this.lives} | Poder: Normal`, {
             fontFamily: 'Arial',
             fontSize: '18px',
-            color: '#ffffff',
+            color: '#000000',
+            stroke: '#ffffff',
+            strokeThickness: 2,
             fontStyle: 'bold'
         }).setDepth(10);
         this.waveText = this.add.text(W / 2, 20, '', {
             fontFamily: 'Arial',
             fontSize: '18px',
-            color: '#ffffff',
+            color: '#000000',
+            stroke: '#ffffff',
+            strokeThickness: 2,
             fontStyle: 'bold'
         }).setOrigin(0.5).setDepth(10);
         this.scoreText = this.add.text(20, 72, `Puntaje: ${this.score}`, {
             fontFamily: 'Arial',
             fontSize: '16px',
-            color: '#ffffff',
+            color: '#000000',
+            stroke: '#ffffff',
+            strokeThickness: 2,
             fontStyle: 'bold'
         }).setDepth(10);
 
         this.add.text(20, 48, 'Mover: Flechas | Disparar: Z | Nadar: Espacio | Pausa: P', {
             fontFamily: 'Arial',
             fontSize: '13px',
-            color: '#a0e7e5'
+            color: '#000000',
+            stroke: '#ffffff',
+            strokeThickness: 2
         }).setDepth(10);
 
         this.actualizarEstado();
@@ -231,11 +248,12 @@ export class GameScene extends Phaser.Scene {
             if (!enemy.active) return;
             const direction = this.player.x < enemy.x ? -1 : 1;
             enemy.setVelocityX(direction * enemy.moveSpeed);
+            if (enemy.isBoss) enemy.setVelocityY(Math.sin(time / 450) * 70);
             enemy.setFlipX(direction < 0);
         });
 
         if (!this.isRoundTransitioning &&
-            this.spawnedThisWave === this.enemiesPerWave &&
+            this.spawnedThisWave === this.enemiesInCurrentWave &&
             this.enemies.countActive() === 0) {
             this.finishWave();
         }
@@ -244,19 +262,74 @@ export class GameScene extends Phaser.Scene {
     startWave() {
         this.currentWave += 1;
         this.spawnedThisWave = 0;
-        this.waveText.setText(`Oleada: ${this.currentWave}/${this.totalWaves}`);
+        this.waveText.setText(`Nivel: ${this.currentWave}/${this.totalWaves}`);
         this.events.emit('wave-changed', this.currentWave, this.totalWaves);
 
         if (this.currentWave > 1) {
             this.spawnPowerUp(Phaser.Math.Between(250, 700), Phaser.Math.Between(150, 350));
         }
 
+        if (this.currentWave === this.totalWaves) {
+            this.enemiesInCurrentWave = 1;
+            this.spawnBoss();
+            return;
+        }
+
+        this.enemiesInCurrentWave = this.enemiesPerWave + (this.currentWave - 1) * 2;
         const spawnDelay = Math.max(500, 1100 - (this.currentWave - 1) * 250);
         this.waveSpawnTimer = this.time.addEvent({
             delay: spawnDelay,
-            repeat: this.enemiesPerWave - 1,
+            repeat: this.enemiesInCurrentWave - 1,
             callback: () => this.spawnEnemy()
         });
+    }
+
+    spawnBoss() {
+        this.createPufferBossTexture();
+        const boss = this.enemies.create(this.scale.width - 130, this.scale.height / 2, 'pufferBoss');
+        boss.setScale(2).setDepth(3);
+        boss.body.setSize(72, 68).setOffset(28, 30);
+        boss.body.setAllowGravity(false);
+        boss.setCollideWorldBounds(true);
+        boss.isBoss = true;
+        boss.health = 12;
+        boss.maxHealth = boss.health;
+        boss.moveSpeed = 100;
+        this.boss = boss;
+        this.spawnedThisWave = 1;
+
+        const centerX = this.scale.width / 2;
+        const barWidth = 320;
+        this.bossHealthText = this.add.text(centerX, 92, 'Jefe: Pez globo', {
+            fontFamily: 'Arial',
+            fontSize: '18px',
+            color: '#000000',
+            stroke: '#ffffff',
+            strokeThickness: 2,
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(10);
+        this.bossHealthBackground = this.add.rectangle(centerX, 118, barWidth, 16, 0x3b1d1d)
+            .setDepth(10);
+        this.bossHealthBar = this.add.rectangle(centerX - barWidth / 2, 118, barWidth, 12, 0xe63946)
+            .setOrigin(0, 0.5)
+            .setDepth(11);
+        this.updateBossHealth();
+
+        this.tweens.add({
+            targets: boss,
+            scaleX: 2.1,
+            scaleY: 2.1,
+            duration: 700,
+            yoyo: true,
+            repeat: -1
+        });
+    }
+
+    updateBossHealth() {
+        if (!this.boss || !this.bossHealthBar) return;
+        const ratio = Phaser.Math.Clamp(this.boss.health / this.boss.maxHealth, 0, 1);
+        this.bossHealthBar.setScale(ratio, 1);
+        this.bossHealthText.setText(`Jefe: Pez globo (${this.boss.health}/${this.boss.maxHealth})`);
     }
 
     spawnEnemy() {
@@ -300,6 +373,7 @@ export class GameScene extends Phaser.Scene {
         bubble.setScale(opciones.escala ?? 0.5).setDepth(3);
         bubble.perfora = Boolean(opciones.perfora);
         bubble.didGrowOnHit = false;
+        bubble.hitEnemies = new Set();
         if (bubble.perfora) bubble.setTint(0xffb3f0);
         else bubble.clearTint();
 
@@ -345,7 +419,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     onBubbleHitEnemy(bubble, enemy) {
-        if (!enemy.active || !bubble.body.enable) return;
+        if (!enemy.active || !bubble.body.enable || bubble.hitEnemies.has(enemy)) return;
+        bubble.hitEnemies.add(enemy);
         if (!bubble.didGrowOnHit) {
             bubble.didGrowOnHit = true;
             if (!bubble.perfora) {
@@ -363,13 +438,34 @@ export class GameScene extends Phaser.Scene {
                 }
             });
         }
+        this.damageEnemy(enemy);
+    }
+
+    damageEnemy(enemy) {
+        if (enemy.isBoss) {
+            enemy.health -= 1;
+            this.updateBossHealth();
+            if (enemy.health > 0) {
+                enemy.setTint(0xff7777);
+                this.time.delayedCall(100, () => {
+                    if (enemy.active) enemy.clearTint();
+                });
+                return;
+            }
+        }
         this.derrotarEnemigo(enemy);
     }
 
     derrotarEnemigo(enemy) {
         if (!enemy || !enemy.active) return;
+        if (enemy.isBoss) {
+            this.tweens.killTweensOf(enemy);
+            this.bossHealthText.setVisible(false);
+            this.bossHealthBackground.setVisible(false);
+            this.bossHealthBar.setVisible(false);
+        }
         enemy.destroy();
-        this.score += this.pointsPerEnemy;
+        this.score += enemy.isBoss ? 1000 : this.pointsPerEnemy;
         this.scoreText.setText(`Puntaje: ${this.score}`);
         this.events.emit('score-changed', this.score);
         this.events.emit('enemy-hit', enemy);
@@ -378,7 +474,11 @@ export class GameScene extends Phaser.Scene {
     // Choque con enemigo: pierde una vida y queda protegido 1 segundo
     onPlayerHitEnemy(player, enemy) {
         if (this.poderManager.tieneEscudo()) {
-            this.derrotarEnemigo(enemy);
+            if (enemy.isBoss) {
+                if (this.time.now < (enemy.nextShieldHit || 0)) return;
+                enemy.nextShieldHit = this.time.now + 500;
+            }
+            this.damageEnemy(enemy);
             return;
         }
         if (this.invulnerable) return;
@@ -438,7 +538,13 @@ export class GameScene extends Phaser.Scene {
             const btn = this.add.circle(x, y, 32, 0xffffff, 0.25)
                 .setDepth(10)
                 .setInteractive(new Phaser.Geom.Circle(32, 32, 44), Phaser.Geom.Circle.Contains);
-            this.add.text(x, y, label, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' })
+            this.add.text(x, y, label, {
+                fontSize: '22px',
+                color: '#000000',
+                stroke: '#ffffff',
+                strokeThickness: 2,
+                fontStyle: 'bold'
+            })
                 .setOrigin(0.5)
                 .setDepth(10);
 
@@ -491,5 +597,49 @@ export class GameScene extends Phaser.Scene {
         g.fillCircle(14, 14, 14);
         g.generateTexture('tempPowerUp', 28, 28);
         g.destroy();
+    }
+
+    createPufferBossTexture() {
+        if (this.textures.exists('pufferBoss')) return;
+
+        const graphics = this.make.graphics({ add: false });
+        const centerX = 64;
+        const centerY = 64;
+
+        graphics.fillStyle(0xc9792b, 1);
+        for (let i = 0; i < 16; i += 1) {
+            const angle = (i / 16) * Math.PI * 2;
+            const baseRadius = 36;
+            const tipRadius = 59;
+            const halfWidth = 8;
+            const baseX = centerX + Math.cos(angle) * baseRadius;
+            const baseY = centerY + Math.sin(angle) * baseRadius;
+            const sideX = -Math.sin(angle) * halfWidth;
+            const sideY = Math.cos(angle) * halfWidth;
+            const tipX = centerX + Math.cos(angle) * tipRadius;
+            const tipY = centerY + Math.sin(angle) * tipRadius;
+            graphics.fillTriangle(
+                baseX - sideX, baseY - sideY,
+                baseX + sideX, baseY + sideY,
+                tipX, tipY
+            );
+        }
+
+        graphics.fillStyle(0xf4b942, 1);
+        graphics.fillCircle(centerX, centerY, 40);
+        graphics.lineStyle(4, 0x9c5b12, 1);
+        graphics.strokeCircle(centerX, centerY, 40);
+        graphics.fillStyle(0xf8d889, 1);
+        graphics.fillEllipse(64, 77, 48, 28);
+        graphics.fillStyle(0xffffff, 1);
+        graphics.fillCircle(77, 51, 8);
+        graphics.fillCircle(77, 70, 8);
+        graphics.fillStyle(0x1f2937, 1);
+        graphics.fillCircle(80, 52, 3);
+        graphics.fillCircle(80, 71, 3);
+        graphics.lineStyle(4, 0x7a3418, 1);
+        graphics.lineBetween(76, 88, 88, 86);
+        graphics.generateTexture('pufferBoss', 128, 128);
+        graphics.destroy();
     }
 }
