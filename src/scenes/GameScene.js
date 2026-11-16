@@ -136,7 +136,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     update(time) {
-        if (this.lives <= 0 || this.isRoundTransitioning) return;
+        if (this.lives <= 0) return;
 
         // Movimiento horizontal
         if (this.cursors.left.isDown || this.touchState.left) {
