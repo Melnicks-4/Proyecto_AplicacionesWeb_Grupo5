@@ -25,4 +25,8 @@ Pulsa **Jugar** en el menú. En la partida puedes pausar, continuar, reiniciar y
 
 La partida tiene tres oleadas de cinco enemigos. Los enemigos aparecen por la derecha y persiguen horizontalmente al jugador; cada oleada aumenta su velocidad. Cada enemigo eliminado suma 100 puntos. Se gana al completar las tres oleadas y se pierde al quedarse sin las tres vidas. Los power-ups activan disparo rápido durante seis segundos.
 
+## Verificación
+
+La compilación de producción pasa con `npm run build` (en PowerShell también se puede usar `npm.cmd run build`). Una prueba visual inicial confirma que se muestran la partida y los enemigos. El objetivo de 45 FPS o más sigue pendiente de medición en el navegador y dispositivo objetivo.
+
 Sprites del paquete Fish Pack de Kenney. Consulta `public/assets/License.txt`.
