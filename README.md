@@ -27,6 +27,6 @@ La partida tiene tres niveles: el primero incluye cinco enemigos, el segundo sie
 
 ## Verificación
 
-La compilación de producción pasa con `npm run build` (en PowerShell también se puede usar `npm.cmd run build`). Una prueba visual inicial confirma que se muestran la partida y los enemigos. El objetivo de 45 FPS o más sigue pendiente de medición en el navegador y dispositivo objetivo.
+La compilación de producción pasa con `npm run build` (en PowerShell también se puede usar `npm.cmd run build`). Una prueba visual inicial confirma que se muestran la partida y los enemigos. 
 
 Sprites del paquete Fish Pack de Kenney. Consulta `public/assets/License.txt`.
