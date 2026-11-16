@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../audio/AudioManager.js';
+import { PoderManager } from '../managers/PoderManager.js';
+import { CLAVE_PEZ, obtenerPez } from '../data/peces.js';
+import { ALTO_SUELO, crearSuelo } from '../objects/suelo.js';
 import bubbleAudioUrl from '../audio/bubble.mp3';
 import oceanAudioUrl from '../audio/Ocean.ogg';
 import powerUpAudioUrl from '../audio/power_up.mp3';
@@ -13,7 +16,19 @@ export class GameScene extends Phaser.Scene {
     // todavía no los cargó. Si ya existen con ese nombre, Phaser los ignora.
     preload() {
         const assets = import.meta.env.BASE_URL + 'assets/images/'; // misma ruta que usa la persona 1
-        this.load.image('fish_orange', assets + 'fish_orange.png');
+        ['fish_orange', 'fish_blue', 'fish_green', 'fish_pink'].forEach((key) => {
+            if (!this.textures.exists(key)) this.load.image(key, assets + key + '.png');
+        });
+        [
+            ['arena_top', 'terrain_sand_top_e.png'],
+            ['roca_a', 'rock_a.png'],
+            ['roca_b', 'rock_b.png'],
+            ['alga_verde', 'seaweed_green_a.png'],
+            ['alga_rosa', 'seaweed_pink_a.png'],
+            ['alga_naranja', 'seaweed_orange_a.png']
+        ].forEach(([key, file]) => {
+            if (!this.textures.exists(key)) this.load.image(key, assets + file);
+        });
         this.load.image('fish_blue_skeleton_outline', assets + 'fish_blue_skeleton_outline.png');
         this.load.image('fish_green_skeleton_outline', assets + 'fish_green_skeleton_outline.png');
         this.load.image('fish_red_skeleton_outline', assets + 'fish_red_skeleton_outline.png');
@@ -30,22 +45,18 @@ export class GameScene extends Phaser.Scene {
         const W = this.scale.width;   // el tamaño lo define main.js (persona 1)
         const H = this.scale.height;
         this.cameras.main.setBackgroundColor('#005b82');
-        // Fondo de agua: el tile mide 64x64, se REPITE para cubrir toda la pantalla
         if (this.textures.exists('fondo-marino')) {
-            this.add.tileSprite(0, 0, W, H, 'fondo-marino').setOrigin(0x7aa9c4);
+            this.add.tileSprite(0, 0, W, H, 'fondo-marino').setOrigin(0).setDepth(0);
         }
 
-        // Algas decorativas apoyadas en el suelo
         if (this.textures.exists('alga')) {
             [80, 330, 600, 860].forEach((x) => {
-                this.add.image(x, H - 70, 'alga').setOrigin(0.5, 1);
+                this.add.image(x, H - ALTO_SUELO, 'alga').setOrigin(0.5, 1).setDepth(2);
             });
         }
         this.lives = 3;
-        this.hasRapidFire = false;
         this.lastFired = 0;
         this.invulnerable = false;   // evita perder varias vidas de golpe
-        this.powerUpTimer = null;    // temporizador del power-up activo
         this.totalWaves = 3;
         this.enemiesPerWave = 5;
         this.pointsPerEnemy = 100;
@@ -53,6 +64,7 @@ export class GameScene extends Phaser.Scene {
         this.score = 0;
         this.spawnedThisWave = 0;
         this.isRoundTransitioning = false;
+        this.pez = obtenerPez(this.registry.get(CLAVE_PEZ));
         this.audioManager = new AudioManager(this);
 
         const oceanMusic = this.sound.add('ocean', { loop: true, volume: 0.35 });
@@ -72,24 +84,22 @@ export class GameScene extends Phaser.Scene {
         // 2. Texturas temporales (se usan solo si el sprite real no está cargado)
         this.createTempTextures();
 
-        // 3. Suelo marino estático con Arcade Physics
-        this.platforms = this.physics.add.staticGroup();
-        const ground = this.add.rectangle(W / 2, H - 35, W, 70, 0x143d59);
-        this.physics.add.existing(ground, true);
-        this.platforms.add(ground);
+        // 3. Suelo marino con arena, decoración y físicas
+        this.platforms = crearSuelo(this);
 
         // 4. Jugador (pez con físicas y rebote)
         // *** AQUÍ VA EL NOMBRE DEL SPRITE DEL PEZ ***
         // Si 'fish_orange' fue cargado por la persona 1, se usa; si no, la bola temporal
-        const fishKey = this.textures.exists('fish_orange') ? 'fish_orange' : 'tempFish';
-        this.player = this.physics.add.image(W * 0.3, 300, fishKey);
-        if (fishKey === 'fish_orange') {
-            this.player.setScale(0.8); // el sprite mide 64x64; ajusta 0.8 si se ve grande/pequeño
-            this.player.body.setSize(46, 28).setOffset(9, 17); // caja de colisión ajustada al pez
+        const fishKey = this.textures.exists(this.pez.textura) ? this.pez.textura : 'tempFish';
+        this.player = this.physics.add.image(W * 0.3, 300, fishKey).setDepth(3);
+        if (fishKey !== 'tempFish') {
+            this.player.setScale(0.8);
+            this.player.body.setSize(80, 44).setOffset(24, 42);
         }
         this.player.setCollideWorldBounds(true);
         this.player.setBounce(0.2);
         this.physics.add.collider(this.player, this.platforms);
+        this.poderManager = new PoderManager(this, this.pez);
 
         // 5. Grupo de disparos (burbujas)
         const bubbleKey = this.textures.exists('bubble_a') ? 'bubble_a' : 'tempBubble';
@@ -125,10 +135,14 @@ export class GameScene extends Phaser.Scene {
         this.input.keyboard.on('keydown-P', this.pauseGame, this);
         this.input.keyboard.on('keydown-ESC', this.pauseGame, this);
         this.add.circle(W - 40, 40, 20, 0xffffff, 0.25)
+            .setDepth(10)
             .setInteractive()
             .on('pointerdown', () => this.pauseGame());
-        this.add.text(W - 40, 40, '||', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.text(W - 40, 40, '||', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' })
+            .setOrigin(0.5)
+            .setDepth(10);
         this.add.circle(W - 95, 40, 20, 0xffffff, 0.25)
+            .setDepth(10)
             .setInteractive()
             .on('pointerdown', () => {
                 const soundEnabled = this.audioManager.toggleSound();
@@ -142,34 +156,35 @@ export class GameScene extends Phaser.Scene {
                 fontSize: '18px',
                 color: '#ffffff'
             }
-        ).setOrigin(0.5);
+        ).setOrigin(0.5).setDepth(10);
 
         // 10. Interfaz de pruebas (la persona 4 hará el HUD final)
-        this.statusText = this.add.text(20, 20, `Vidas: ${this.lives} | Disparo: Normal`, {
+        this.statusText = this.add.text(20, 20, `Vidas: ${this.lives} | Poder: Normal`, {
             fontFamily: 'Arial',
             fontSize: '18px',
             color: '#ffffff',
             fontStyle: 'bold'
-        });
+        }).setDepth(10);
         this.waveText = this.add.text(W / 2, 20, '', {
             fontFamily: 'Arial',
             fontSize: '18px',
             color: '#ffffff',
             fontStyle: 'bold'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(10);
         this.scoreText = this.add.text(20, 72, `Puntaje: ${this.score}`, {
             fontFamily: 'Arial',
             fontSize: '16px',
             color: '#ffffff',
             fontStyle: 'bold'
-        });
+        }).setDepth(10);
 
         this.add.text(20, 48, 'Mover: Flechas | Disparar: Z | Nadar: Espacio | Pausa: P', {
             fontFamily: 'Arial',
             fontSize: '13px',
             color: '#a0e7e5'
-        });
+        }).setDepth(10);
 
+        this.actualizarEstado();
         this.startWave();
     }
 
@@ -178,10 +193,10 @@ export class GameScene extends Phaser.Scene {
 
         // Movimiento horizontal
         if (this.cursors.left.isDown || this.touchState.left) {
-            this.player.setVelocityX(-220);
+            this.player.setVelocityX(-this.pez.velocidad);
             this.player.setFlipX(true); // voltea el pez a la izquierda
         } else if (this.cursors.right.isDown || this.touchState.right) {
-            this.player.setVelocityX(220);
+            this.player.setVelocityX(this.pez.velocidad);
             this.player.setFlipX(false); // voltea el pez a la derecha
         } else {
             this.player.setVelocityX(0);
@@ -189,19 +204,25 @@ export class GameScene extends Phaser.Scene {
 
         // Impulso de natación hacia arriba
         if (this.cursors.up.isDown || this.cursors.space.isDown || this.touchState.up) {
-            this.player.setVelocityY(-250);
+            this.player.setVelocityY(-this.pez.nado);
         }
 
         // Sistema de disparos con cadencia
-        const fireCooldown = this.hasRapidFire ? 180 : 450;
+        const fireCooldown = this.poderManager.cadencia();
         if ((this.fireKey.isDown || this.touchState.fire) && time > this.lastFired) {
-            this.shootBubble();
+            this.poderManager.disparar();
             this.lastFired = time + fireCooldown;
         }
+        this.poderManager.update();
 
         // Reciclar burbujas que salen de la pantalla
         this.bubbles.getChildren().forEach((bubble) => {
-            if (bubble.active && (bubble.x > this.scale.width + 20 || bubble.x < -20)) {
+            if (bubble.active && (
+                bubble.x > this.scale.width + 40 ||
+                bubble.x < -40 ||
+                bubble.y < -40
+            )) {
+                this.tweens.killTweensOf(bubble);
                 bubble.disableBody(true, true);
             }
         });
@@ -213,7 +234,9 @@ export class GameScene extends Phaser.Scene {
             enemy.setFlipX(direction < 0);
         });
 
-        if (this.spawnedThisWave === this.enemiesPerWave && this.enemies.countActive() === 0) {
+        if (!this.isRoundTransitioning &&
+            this.spawnedThisWave === this.enemiesPerWave &&
+            this.enemies.countActive() === 0) {
             this.finishWave();
         }
     }
@@ -223,6 +246,10 @@ export class GameScene extends Phaser.Scene {
         this.spawnedThisWave = 0;
         this.waveText.setText(`Oleada: ${this.currentWave}/${this.totalWaves}`);
         this.events.emit('wave-changed', this.currentWave, this.totalWaves);
+
+        if (this.currentWave > 1) {
+            this.spawnPowerUp(Phaser.Math.Between(250, 700), Phaser.Math.Between(150, 350));
+        }
 
         const spawnDelay = Math.max(500, 1100 - (this.currentWave - 1) * 250);
         this.waveSpawnTimer = this.time.addEvent({
@@ -239,8 +266,8 @@ export class GameScene extends Phaser.Scene {
         const y = Phaser.Math.Between(90, this.scale.height - 150);
         const enemy = this.enemies.create(x, y, texture);
 
-        enemy.setScale(0.75);
-        enemy.body.setSize(42, 30).setOffset(11, 17);
+        enemy.setScale(0.75).setDepth(3);
+        enemy.body.setSize(84, 44).setOffset(22, 42);
         enemy.body.setAllowGravity(false);
         enemy.setCollideWorldBounds(true);
         enemy.moveSpeed = 75 + (this.currentWave - 1) * 35;
@@ -262,22 +289,27 @@ export class GameScene extends Phaser.Scene {
         });
     }
 
-    shootBubble() {
+    shootBubble(velocidadY = -20, opciones = {}) {
         const bubble = this.bubbles.get(this.player.x, this.player.y);
         if (!bubble) return; // ya hay 30 burbujas en pantalla
 
         // Reactiva el cuerpo físico y lo coloca en el pez
+        this.tweens.killTweensOf(bubble);
         bubble.enableBody(true, this.player.x, this.player.y, true, true);
         bubble.body.setAllowGravity(false);
-        bubble.setScale(0.5);
+        bubble.setScale(opciones.escala ?? 0.5).setDepth(3);
+        bubble.perfora = Boolean(opciones.perfora);
+        bubble.didGrowOnHit = false;
+        if (bubble.perfora) bubble.setTint(0xffb3f0);
+        else bubble.clearTint();
 
-        // Ajusta la colisión del aro de bubble_a
+        // El aro de bubble_a mide 128x128; ajusta su círculo de colisión.
         if (bubble.texture.key === 'bubble_a') {
-            bubble.body.setCircle(8, 24, 24);
+            bubble.body.setCircle(20, 44, 44);
         }
 
         const direction = this.player.flipX ? -1 : 1;
-        bubble.setVelocity(450 * direction, -20);
+        bubble.setVelocity(450 * direction, velocidadY);
 
         this.audioManager.play('bubble');
         this.events.emit('player-shoot'); // la persona 4 conecta el sonido
@@ -289,10 +321,11 @@ export class GameScene extends Phaser.Scene {
         const powerUpKey = this.textures.exists('bubble_c') ? 'bubble_c' : 'tempPowerUp';
         const powerUp = this.powerUps.create(x, y, powerUpKey);
         powerUp.body.setAllowGravity(false);
+        powerUp.setDepth(3);
         if (powerUpKey === 'bubble_c') {
             powerUp.setTint(0xf9ed69);
             powerUp.setScale(1.2);
-            powerUp.body.setCircle(14, 18, 18);
+            powerUp.body.setCircle(24, 40, 40);
         }
         // Animación flotante
         this.tweens.add({
@@ -306,31 +339,35 @@ export class GameScene extends Phaser.Scene {
 
     collectPowerUp(player, powerUp) {
         powerUp.destroy();
-        this.hasRapidFire = true;
+        this.poderManager.activar();
         this.audioManager.play('power_up');
-        this.events.emit('powerup-collected'); // sonido (persona 4) y efectos (persona 3)
-        this.statusText.setText(`Vidas: ${this.lives} | Disparo: RÁPIDO (Power-up activo)`);
-
-        // Si ya había un temporizador, lo cancelamos y empezamos de nuevo
-        if (this.powerUpTimer) this.powerUpTimer.remove(false);
-        this.powerUpTimer = this.time.delayedCall(6000, () => {
-            this.hasRapidFire = false;
-            this.statusText.setText(`Vidas: ${this.lives} | Disparo: Normal`);
-        });
+        this.events.emit('powerup-collected', this.pez.poder); // sonido (persona 4) y efectos (persona 3)
     }
 
     onBubbleHitEnemy(bubble, enemy) {
         if (!enemy.active || !bubble.body.enable) return;
-        bubble.body.enable = false;
-        bubble.setVelocity(0, 0);
-        this.tweens.add({
-            targets: bubble,
-            scaleX: 2,
-            scaleY: 2,
-            duration: 250,
-            ease: 'Quad.Out',
-            onComplete: () => bubble.disableBody(true, true)
-        });
+        if (!bubble.didGrowOnHit) {
+            bubble.didGrowOnHit = true;
+            if (!bubble.perfora) {
+                bubble.body.enable = false;
+                bubble.setVelocity(0, 0);
+            }
+            this.tweens.add({
+                targets: bubble,
+                scaleX: 2,
+                scaleY: 2,
+                duration: 250,
+                ease: 'Quad.Out',
+                onComplete: () => {
+                    if (!bubble.perfora) bubble.disableBody(true, true);
+                }
+            });
+        }
+        this.derrotarEnemigo(enemy);
+    }
+
+    derrotarEnemigo(enemy) {
+        if (!enemy || !enemy.active) return;
         enemy.destroy();
         this.score += this.pointsPerEnemy;
         this.scoreText.setText(`Puntaje: ${this.score}`);
@@ -339,7 +376,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Choque con enemigo: pierde una vida y queda protegido 1 segundo
-    onPlayerHitEnemy() {
+    onPlayerHitEnemy(player, enemy) {
+        if (this.poderManager.tieneEscudo()) {
+            this.derrotarEnemigo(enemy);
+            return;
+        }
         if (this.invulnerable) return;
         this.invulnerable = true;
         this.takeDamage();
@@ -352,8 +393,7 @@ export class GameScene extends Phaser.Scene {
         this.lives -= 1;
         this.events.emit('lives-changed', this.lives); // para el HUD (persona 4)
 
-        const mode = this.hasRapidFire ? 'RÁPIDO' : 'Normal';
-        this.statusText.setText(`Vidas: ${this.lives} | Disparo: ${mode}`);
+        this.actualizarEstado();
 
         this.tweens.add({
             targets: this.player,
@@ -369,6 +409,11 @@ export class GameScene extends Phaser.Scene {
             // Flujo: sin vidas → pantalla de Game Over (escena 'Derrota' de la persona 1)
             this.time.delayedCall(800, () => this.scene.start('Derrota'));
         }
+
+    }
+
+    actualizarEstado() {
+        this.statusText.setText(`Vidas: ${this.lives} | ${this.pez.nombre} | Poder: ${this.poderManager.textoEstado()}`);
     }
 
     // Abre la escena de pausa; 'Pausa' se encarga de reanudar esta escena
@@ -391,8 +436,11 @@ export class GameScene extends Phaser.Scene {
         const makeButton = (x, y, label, key) => {
             // Zona táctil más grande que el dibujo (radio 44 vs 32) para que sea fácil tocar con el dedo
             const btn = this.add.circle(x, y, 32, 0xffffff, 0.25)
+                .setDepth(10)
                 .setInteractive(new Phaser.Geom.Circle(32, 32, 44), Phaser.Geom.Circle.Contains);
-            this.add.text(x, y, label, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+            this.add.text(x, y, label, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' })
+                .setOrigin(0.5)
+                .setDepth(10);
 
             let releaseTimer = null;
 

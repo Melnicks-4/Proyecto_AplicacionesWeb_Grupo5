@@ -13,18 +13,20 @@ export class PoderManager {
     }
 
     activar() {
-        // Si ya había un poder activo, se reinicia el tiempo
         if (this.timer) this.timer.remove(false);
         if (!this.activo && this.pez.poder === 'escudo') this.crearEscudo();
 
         this.activo = true;
         this.timer = this.escena.time.delayedCall(DURACION_PODER, () => this.desactivar());
+        this.escena.actualizarEstado();
     }
 
     desactivar() {
+        if (!this.activo) return;
         this.activo = false;
         this.timer = null;
         if (this.escudo) {
+            this.escena.tweens.killTweensOf(this.escudo);
             this.escudo.destroy();
             this.escudo = null;
         }
@@ -32,27 +34,24 @@ export class PoderManager {
         this.escena.actualizarEstado();
     }
 
-    // Tiempo entre disparos según el poder
     cadencia() {
         return this.activo && this.pez.poder === 'rapido' ? 160 : 450;
     }
 
-    // Dispara una o varias burbujas según el poder
     disparar() {
-        const escena = this.escena;
         if (!this.activo) {
-            escena.crearBurbuja(-20);
+            this.escena.shootBubble();
             return;
         }
         switch (this.pez.poder) {
             case 'triple':
-                [-150, -20, 110].forEach((vy) => escena.crearBurbuja(vy));
+                [-150, -20, 110].forEach((vy) => this.escena.shootBubble(vy));
                 break;
             case 'gigante':
-                escena.crearBurbuja(-10, { escala: 1.2, perfora: true });
+                this.escena.shootBubble(-10, { escala: 1.2, perfora: true });
                 break;
             default:
-                escena.crearBurbuja(-20);
+                this.escena.shootBubble();
         }
     }
 
@@ -74,14 +73,13 @@ export class PoderManager {
         });
     }
 
-    // Se llama en cada frame para que el escudo siga al pez
     update() {
-        if (this.escudo) {
+        if (this.escudo && this.escena.player.active) {
             this.escudo.setPosition(this.escena.player.x, this.escena.player.y);
         }
     }
 
     textoEstado() {
-        return this.activo ? ${this.pez.poderNombre}! : 'Normal';
+        return this.activo ? `${this.pez.poderNombre}!` : 'Normal';
     }
 }

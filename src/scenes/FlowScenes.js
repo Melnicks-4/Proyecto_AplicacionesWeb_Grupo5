@@ -13,6 +13,17 @@ export class Inicio extends Phaser.Scene {
     this.load.image('pez', assets + 'fish_orange.png');
     this.load.image('fondo-marino', assets + 'background_terrain.png');
     this.load.image('alga', assets + 'background_seaweed_a.png');
+
+    ['fish_orange', 'fish_blue', 'fish_green', 'fish_pink'].forEach((clave) => {
+      this.load.image(clave, assets + clave + '.png');
+    });
+
+    this.load.image('arena_top', assets + 'terrain_sand_top_e.png');
+    this.load.image('roca_a', assets + 'rock_a.png');
+    this.load.image('roca_b', assets + 'rock_b.png');
+    this.load.image('alga_verde', assets + 'seaweed_green_a.png');
+    this.load.image('alga_rosa', assets + 'seaweed_pink_a.png');
+    this.load.image('alga_naranja', assets + 'seaweed_orange_a.png');
   }
 
   create() {
@@ -28,7 +39,7 @@ export class Menu extends Phaser.Scene {
   create() {
     this.add.image(480, 118, 'pez').setScale(1.4);
     texto(this, 480, 218, 'Angry Fins', 52);
-    boton(this, 480, 310, 'Jugar', () => this.scene.start('Game'));
+    boton(this, 480, 310, 'Jugar', () => this.scene.start('SeleccionPez'));
   }
 }
 
@@ -50,7 +61,11 @@ export class Pausa extends Phaser.Scene {
       this.scene.stop('Game');
       this.scene.start('Game');
     });
-    boton(this, 480, 334, 'Menú principal', () => {
+    boton(this, 480, 334, 'Cambiar pez', () => {
+      this.scene.stop('Game');
+      this.scene.start('SeleccionPez');
+    });
+    boton(this, 480, 391, 'Menú principal', () => {
       this.scene.stop('Game');
       this.scene.start('Menu');
     });
@@ -66,7 +81,8 @@ class Resultado extends Phaser.Scene {
   create() {
     texto(this, 480, 154, this.titulo, 50);
     boton(this, 480, 246, 'Volver a jugar', () => this.scene.start('Game'));
-    boton(this, 480, 304, 'Menú principal', () => this.scene.start('Menu'));
+    boton(this, 480, 304, 'Cambiar pez', () => this.scene.start('SeleccionPez'));
+    boton(this, 480, 362, 'Menú principal', () => this.scene.start('Menu'));
   }
 }
 

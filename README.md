@@ -16,14 +16,14 @@ En PowerShell de Windows, si la política de ejecución bloquea `npm.ps1`, usa `
 
 ## Flujo e integración
 
-Pulsa **Jugar** en el menú. En la partida puedes pausar, continuar, reiniciar y volver al menú. Usa las flechas para moverte, **Espacio** para nadar hacia arriba, **Z** para disparar y **P** o **Esc** para pausar.
+Pulsa **Jugar** en el menú y escoge un pez antes de comenzar. Desde la pausa puedes continuar, reiniciar, cambiar de pez o volver al menú. Usa las flechas para moverte, **Espacio** para nadar hacia arriba, **Z** para disparar y **P** o **Esc** para pausar.
 
 - `src/main.js` configura Phaser y registra las escenas.
 - `src/scenes/FlowScenes.js` carga recursos y conecta el menú, la pausa y los resultados.
 - `src/scenes/GameScene.js` contiene la escena de partida.
 - `public/assets/` contiene los sprites y su licencia.
 
-La partida tiene tres oleadas de cinco enemigos. Los enemigos aparecen por la derecha y persiguen horizontalmente al jugador; cada oleada aumenta su velocidad. Cada enemigo eliminado suma 100 puntos. Se gana al completar las tres oleadas y se pierde al quedarse sin las tres vidas. Los power-ups activan disparo rápido durante seis segundos.
+La partida tiene tres oleadas de cinco enemigos. Los enemigos aparecen por la derecha y persiguen horizontalmente al jugador; cada oleada aumenta su velocidad. Cada enemigo eliminado suma 100 puntos. Se gana al completar las tres oleadas y se pierde al quedarse sin las tres vidas. Al recoger un power-up, se activa durante seis segundos la habilidad especial del pez escogido.
 
 ## Verificación
 
