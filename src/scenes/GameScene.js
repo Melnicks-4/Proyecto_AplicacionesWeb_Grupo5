@@ -10,6 +10,9 @@ export class GameScene extends Phaser.Scene {
     preload() {
         const assets = import.meta.env.BASE_URL + 'assets/images/'; // misma ruta que usa la persona 1
         this.load.image('fish_orange', assets + 'fish_orange.png');
+        this.load.image('fish_blue', assets + 'fish_blue.png');
+        this.load.image('fish_green', assets + 'fish_green.png');
+        this.load.image('fish_red', assets + 'fish_red.png');
         this.load.image('bubble_a', assets + 'bubble_a.png');
         this.load.image('bubble_c', assets + 'bubble_c.png');
     }
@@ -35,6 +38,13 @@ export class GameScene extends Phaser.Scene {
         this.lastFired = 0;
         this.invulnerable = false;   // evita perder varias vidas de golpe
         this.powerUpTimer = null;    // temporizador del power-up activo
+        this.totalWaves = 3;
+        this.enemiesPerWave = 5;
+        this.pointsPerEnemy = 100;
+        this.currentWave = 0;
+        this.score = 0;
+        this.spawnedThisWave = 0;
+        this.isRoundTransitioning = false;
 
         // 2. Texturas temporales (se usan solo si el sprite real no está cargado)
         this.createTempTextures();
@@ -74,10 +84,8 @@ export class GameScene extends Phaser.Scene {
         // Colisión de recolección (overlap)
         this.physics.add.overlap(this.player, this.powerUps, this.collectPowerUp, null, this);
 
-        // 7. Enganches para la persona 3 (enemigos)
-        // Grupo vacío: la persona 3 agrega aquí sus enemigos
+        // 7. Enemigos y colisiones
         this.enemies = this.physics.add.group();
-        // Burbuja toca enemigo / enemigo toca al jugador
         this.physics.add.overlap(this.bubbles, this.enemies, this.onBubbleHitEnemy, null, this);
         this.physics.add.overlap(this.player, this.enemies, this.onPlayerHitEnemy, null, this);
 
@@ -105,16 +113,30 @@ export class GameScene extends Phaser.Scene {
             color: '#ffffff',
             fontStyle: 'bold'
         });
+        this.waveText = this.add.text(W / 2, 20, '', {
+            fontFamily: 'Arial',
+            fontSize: '18px',
+            color: '#ffffff',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.scoreText = this.add.text(20, 72, `Puntaje: ${this.score}`, {
+            fontFamily: 'Arial',
+            fontSize: '16px',
+            color: '#ffffff',
+            fontStyle: 'bold'
+        });
 
         this.add.text(20, 48, 'Mover: Flechas | Disparar: Z | Nadar: Espacio | Pausa: P', {
             fontFamily: 'Arial',
             fontSize: '13px',
             color: '#a0e7e5'
         });
+
+        this.startWave();
     }
 
     update(time) {
-        if (this.lives <= 0) return; // sin vidas: no se mueve ni dispara
+        if (this.lives <= 0 || this.isRoundTransitioning) return;
 
         // Movimiento horizontal
         if (this.cursors.left.isDown || this.touchState.left) {
@@ -144,6 +166,61 @@ export class GameScene extends Phaser.Scene {
             if (bubble.active && (bubble.x > this.scale.width + 20 || bubble.x < -20)) {
                 bubble.disableBody(true, true);
             }
+        });
+
+        this.enemies.getChildren().forEach((enemy) => {
+            if (!enemy.active) return;
+            const direction = this.player.x < enemy.x ? -1 : 1;
+            enemy.setVelocityX(direction * enemy.moveSpeed);
+            enemy.setFlipX(direction < 0);
+        });
+
+        if (this.spawnedThisWave === this.enemiesPerWave && this.enemies.countActive() === 0) {
+            this.finishWave();
+        }
+    }
+
+    startWave() {
+        this.currentWave += 1;
+        this.spawnedThisWave = 0;
+        this.waveText.setText(`Oleada: ${this.currentWave}/${this.totalWaves}`);
+        this.events.emit('wave-changed', this.currentWave, this.totalWaves);
+
+        const spawnDelay = Math.max(500, 1100 - (this.currentWave - 1) * 250);
+        this.waveSpawnTimer = this.time.addEvent({
+            delay: spawnDelay,
+            repeat: this.enemiesPerWave - 1,
+            callback: () => this.spawnEnemy()
+        });
+    }
+
+    spawnEnemy() {
+        const textures = ['fish_blue', 'fish_green', 'fish_red'];
+        const texture = textures[(this.spawnedThisWave + this.currentWave - 1) % textures.length];
+        const x = this.scale.width - 45;
+        const y = Phaser.Math.Between(90, this.scale.height - 150);
+        const enemy = this.enemies.create(x, y, texture);
+
+        enemy.setScale(0.75);
+        enemy.body.setSize(42, 30).setOffset(11, 17);
+        enemy.body.setAllowGravity(false);
+        enemy.setCollideWorldBounds(true);
+        enemy.moveSpeed = 75 + (this.currentWave - 1) * 35;
+        this.spawnedThisWave += 1;
+    }
+
+    finishWave() {
+        this.isRoundTransitioning = true;
+
+        if (this.currentWave === this.totalWaves) {
+            this.events.emit('player-won', this.score);
+            this.time.delayedCall(1000, () => this.scene.start('Victoria'));
+            return;
+        }
+
+        this.time.delayedCall(1200, () => {
+            this.isRoundTransitioning = false;
+            this.startWave();
         });
     }
 
@@ -202,9 +279,13 @@ export class GameScene extends Phaser.Scene {
         });
     }
 
-    // La burbuja desaparece; la persona 3 decide qué le pasa al enemigo y el puntaje
     onBubbleHitEnemy(bubble, enemy) {
+        if (!enemy.active) return;
         bubble.disableBody(true, true);
+        enemy.destroy();
+        this.score += this.pointsPerEnemy;
+        this.scoreText.setText(`Puntaje: ${this.score}`);
+        this.events.emit('score-changed', this.score);
         this.events.emit('enemy-hit', enemy);
     }
 
