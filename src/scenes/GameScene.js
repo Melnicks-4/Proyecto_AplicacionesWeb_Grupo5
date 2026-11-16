@@ -7,8 +7,16 @@ import { AudioManager } from '../audio/AudioManager.js';
 import { PoderManager } from '../managers/PoderManager.js';
 import { CLAVE_PEZ, obtenerPez } from '../data/peces.js';
 import { ALTO_SUELO, crearSuelo } from '../objects/suelo.js';
+import {
+    actualizarDisparosJefe,
+    actualizarEnemigos,
+    damageEnemy,
+    spawnBoss,
+    spawnEnemy
+} from '../objects/enemigos.js';
+import { createTouchControls, releaseTouchControls } from '../controls/controlesTactiles.js';
 import { cargarImagenes } from '../assets/manifest.js';
-import { registrarColisiones, registrarColisionDisparosJefe } from '../physics/colisiones.js';
+import { registrarColisiones } from '../physics/colisiones.js';
 import bubbleAudioUrl from '../audio/bubble.mp3';
 import oceanAudioUrl from '../audio/Ocean.mp3';
 import powerUpAudioUrl from '../audio/power_up.mp3';
@@ -123,7 +131,7 @@ export class GameScene extends Phaser.Scene {
 
         // 9. Controles táctiles equivalentes para móvil/tablet
         this.input.addPointer(2); // permite hasta 3 dedos a la vez (mover + disparar)
-        this.createTouchControls();
+        this.touchState = createTouchControls(this);
 
         // Pausa: tecla P o Esc, y botón ⏸ para pantallas táctiles
         this.input.keyboard.on('keydown-P', this.pauseGame, this);
@@ -210,7 +218,7 @@ export class GameScene extends Phaser.Scene {
         }
         if (this.escudoExtra.visible) this.escudoExtra.setPosition(this.player.x, this.player.y);
 
-        if (this.boss?.active) this.actualizarDisparosJefe();
+        if (this.boss?.active) actualizarDisparosJefe(this);
 
         const jefeEnSegundaFase = this.boss?.active && this.boss.health <= this.boss.maxHealth / 2;
         const hayMarea = !this.isRoundTransitioning && (this.currentWave === 1 || jefeEnSegundaFase);
@@ -260,18 +268,7 @@ export class GameScene extends Phaser.Scene {
             }
         });
 
-        this.enemies.getChildren().forEach((enemy) => {
-            if (!enemy.active) return;
-            if (!enemy.isBoss) {
-                this.moverEnemigo(enemy, delta);
-                return;
-            }
-            const direction = this.player.x < enemy.x ? -1 : 1;
-            const cargando = enemy.inflado;
-            enemy.setVelocityX(cargando ? 0 : direction * enemy.moveSpeed);
-            enemy.setVelocityY(cargando ? 0 : Math.sin(time / 450) * 45);
-            enemy.setFlipX(direction < 0);
-        });
+        actualizarEnemigos(this, time, delta);
 
         if (!this.isRoundTransitioning &&
             this.spawnedThisWave === this.enemiesInCurrentWave &&
@@ -359,7 +356,7 @@ export class GameScene extends Phaser.Scene {
 
         if (this.currentWave === this.totalWaves) {
             this.enemiesInCurrentWave = 1;
-            this.spawnBoss();
+            spawnBoss(this);
             return;
         }
 
@@ -368,149 +365,8 @@ export class GameScene extends Phaser.Scene {
         this.waveSpawnTimer = this.time.addEvent({
             delay: spawnDelay,
             repeat: this.enemiesInCurrentWave - 1,
-            callback: () => this.spawnEnemy()
+            callback: () => spawnEnemy(this)
         });
-    }
-
-    spawnBoss() {
-        const boss = this.enemies.create(this.scale.width - 130, this.scale.height / 2, 'pufferBoss');
-        boss.setScale(2).setDepth(3);
-        boss.body.setSize(72, 68).setOffset(28, 30);
-        boss.body.setAllowGravity(false);
-        boss.setCollideWorldBounds(true);
-        boss.isBoss = true;
-        boss.health = 12;
-        boss.maxHealth = boss.health;
-        boss.moveSpeed = 65;
-        boss.inflado = false;
-        this.boss = boss;
-        this.spawnedThisWave = 1;
-
-        const centerX = this.scale.width / 2;
-        const barWidth = 320;
-        this.bossHealthText = this.add.text(centerX, 92, 'Jefe: Pez globo', {
-            fontFamily: 'Arial',
-            fontSize: '18px',
-            color: '#000000',
-            stroke: '#ffffff',
-            strokeThickness: 2,
-            fontStyle: 'bold'
-        }).setOrigin(0.5).setDepth(10);
-        this.bossHealthBackground = this.add.rectangle(centerX, 118, barWidth, 16, 0x3b1d1d)
-            .setDepth(10);
-        this.bossHealthBar = this.add.rectangle(centerX - barWidth / 2, 118, barWidth, 12, 0xe63946)
-            .setOrigin(0, 0.5)
-            .setDepth(11);
-        this.updateBossHealth();
-
-        this.estadoJefe = this.add.text(centerX, 148, '', {
-            fontFamily: 'Arial',
-            fontSize: '18px',
-            backgroundColor: '#07334c',
-            color: '#ffffff',
-            padding: { x: 10, y: 4 }
-        }).setOrigin(0.5).setDepth(10);
-        this.disparosJefe = this.physics.add.group({ defaultKey: 'bubble_b', maxSize: 15 });
-        registrarColisionDisparosJefe(this);
-        this.abrirVentanaJefe(boss);
-    }
-
-    abrirVentanaJefe(boss) {
-        boss.inflado = false;
-        boss.setScale(2).clearTint();
-        this.estadoJefe.setText('Vulnerable · ¡Dispara!');
-        this.time.delayedCall(2600, () => {
-            if (!boss.active || this.lives <= 0) return;
-
-            boss.inflado = true;
-            boss.setScale(2.35).setTint(0xffc66e);
-            boss.setVelocity(0, 0);
-            this.estadoJefe.setText('Inflado · ¡Esquiva la ráfaga!');
-            const angulo = Phaser.Math.Angle.Between(boss.x, boss.y, this.player.x, this.player.y);
-
-            this.time.delayedCall(1100, () => {
-                if (!boss.active || this.lives <= 0) return;
-                this.lanzarRafagaJefe(boss, angulo);
-                this.abrirVentanaJefe(boss);
-            });
-        });
-    }
-
-    lanzarRafagaJefe(boss, angulo) {
-        for (const apertura of [-0.52, -0.26, 0, 0.26, 0.52]) {
-            const direccion = angulo + apertura;
-            const x = boss.x + Math.cos(direccion) * 55;
-            const y = boss.y + Math.sin(direccion) * 55;
-            const disparo = this.disparosJefe.get(x, y);
-            if (!disparo) break;
-            disparo.enableBody(true, x, y, true, true);
-            disparo.setScale(0.3).setTint(0xff8b77).setDepth(4);
-            disparo.body.setCircle(disparo.width * 0.27, disparo.width * 0.23, disparo.height * 0.23);
-            disparo.body.setAllowGravity(false);
-            disparo.setVelocity(Math.cos(direccion) * 260, Math.sin(direccion) * 260);
-        }
-    }
-
-    actualizarDisparosJefe() {
-        for (const disparo of this.disparosJefe.getChildren()) {
-            if (disparo.active && (
-                disparo.x < -40 || disparo.x > this.scale.width + 40 ||
-                disparo.y < -40 || disparo.y > this.scale.height + 40
-            )) {
-                disparo.disableBody(true, true);
-            }
-        }
-    }
-
-    updateBossHealth() {
-        if (!this.boss || !this.bossHealthBar) return;
-        const ratio = Phaser.Math.Clamp(this.boss.health / this.boss.maxHealth, 0, 1);
-        this.bossHealthBar.setScale(ratio, 1);
-        this.bossHealthText.setText(`Jefe: Pez globo (${this.boss.health}/${this.boss.maxHealth})`);
-    }
-
-    spawnEnemy() {
-        const textures = ['fish_blue_skeleton_outline', 'fish_green_skeleton_outline', 'fish_red_skeleton_outline'];
-        const texture = textures[(this.spawnedThisWave + this.currentWave - 1) % textures.length];
-        const x = this.scale.width - 45;
-        const y = Phaser.Math.Between(90, this.scale.height - 150);
-        const enemy = this.enemies.create(x, y, texture);
-
-        enemy.setScale(0.75).setDepth(3);
-        enemy.body.setSize(84, 44).setOffset(22, 42);
-        enemy.body.setAllowGravity(false);
-        enemy.setCollideWorldBounds(true);
-        enemy.moveSpeed = 75 + (this.currentWave - 1) * 35;
-        enemy.patron = ['patrulla', 'zigzag', 'persecucion'][this.spawnedThisWave % 3];
-        enemy.direccion = -1;
-        enemy.tiempoNado = Phaser.Math.Between(0, 1000);
-        this.spawnedThisWave += 1;
-    }
-
-    moverEnemigo(enemy, delta) {
-        enemy.tiempoNado += delta;
-        const margen = 45;
-        const fondo = this.scale.height - 120;
-        if (enemy.x <= margen) enemy.direccion = 1;
-        if (enemy.x >= this.scale.width - margen) enemy.direccion = -1;
-
-        let velocidadY = 0;
-        if (enemy.patron === 'zigzag') {
-            velocidadY = Math.sin(enemy.tiempoNado / 260) * 95;
-        }
-
-        const buscando = enemy.patron === 'persecucion' && enemy.tiempoNado % 3200 < 1250;
-        let velocidadX = enemy.direccion * enemy.moveSpeed;
-        if (buscando && Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) < 260) {
-            velocidadX = Phaser.Math.Clamp(this.player.x - enemy.x, -enemy.moveSpeed, enemy.moveSpeed);
-            velocidadY = Phaser.Math.Clamp(this.player.y - enemy.y, -70, 70);
-        }
-
-        if ((enemy.y <= 95 && velocidadY < 0) || (enemy.y >= fondo && velocidadY > 0)) {
-            velocidadY = 0;
-        }
-        enemy.setVelocity(velocidadX, velocidadY);
-        if (velocidadX !== 0) enemy.setFlipX(velocidadX < 0);
     }
 
     crearBurbujaDeVida() {
@@ -652,40 +508,7 @@ export class GameScene extends Phaser.Scene {
                 }
             });
         }
-        this.damageEnemy(enemy);
-    }
-
-    damageEnemy(enemy) {
-        if (enemy.isBoss) {
-            if (enemy.inflado) return;
-            enemy.health -= 1;
-            this.updateBossHealth();
-            if (enemy.health > 0) {
-                enemy.setTint(0xff7777);
-                this.time.delayedCall(100, () => {
-                    if (enemy.active && !enemy.inflado) enemy.clearTint();
-                });
-                return;
-            }
-        }
-        this.derrotarEnemigo(enemy);
-    }
-
-    derrotarEnemigo(enemy) {
-        if (!enemy || !enemy.active) return;
-        if (enemy.isBoss) {
-            this.tweens.killTweensOf(enemy);
-            this.estadoJefe.setVisible(false);
-            this.disparosJefe.clear(true, true);
-            this.bossHealthText.setVisible(false);
-            this.bossHealthBackground.setVisible(false);
-            this.bossHealthBar.setVisible(false);
-        }
-        enemy.destroy();
-        this.score += enemy.isBoss ? 1000 : this.pointsPerEnemy;
-        this.scoreText.setText(`Puntaje: ${this.score}`);
-        this.events.emit('score-changed', this.score);
-        this.events.emit('enemy-hit', enemy);
+        damageEnemy(this, enemy);
     }
 
     // Choque con enemigo: pierde una vida y queda protegido durante el parpadeo
@@ -695,7 +518,7 @@ export class GameScene extends Phaser.Scene {
                 if (this.time.now < (enemy.nextShieldHit || 0)) return;
                 enemy.nextShieldHit = this.time.now + 500;
             }
-            this.damageEnemy(enemy);
+            damageEnemy(this, enemy);
             return;
         }
         if (this.invulnerable) return;
@@ -777,56 +600,9 @@ export class GameScene extends Phaser.Scene {
             return;
         }
         // Suelta los botones táctiles para que el pez no siga moviéndose al volver
-        Object.keys(this.touchState).forEach((k) => { this.touchState[k] = false; });
+        releaseTouchControls(this.touchState);
         this.scene.launch('Pausa');
         this.scene.pause();
-    }
-
-    createTouchControls() {
-        this.touchState = { left: false, right: false, up: false, fire: false };
-
-        const makeButton = (x, y, label, key) => {
-            // Zona táctil más grande que el dibujo (radio 44 vs 32) para que sea fácil tocar con el dedo
-            const btn = this.add.circle(x, y, 32, 0xffffff, 0.25)
-                .setDepth(10)
-                .setInteractive(new Phaser.Geom.Circle(32, 32, 44), Phaser.Geom.Circle.Contains);
-            this.add.text(x, y, label, {
-                fontSize: '22px',
-                color: '#000000',
-                stroke: '#ffffff',
-                strokeThickness: 2,
-                fontStyle: 'bold'
-            })
-                .setOrigin(0.5)
-                .setDepth(10);
-
-            let releaseTimer = null;
-
-            const press = () => {
-                if (releaseTimer) releaseTimer.remove(false); // si vuelve a tocar, cancela el apagado
-                this.touchState[key] = true;
-                btn.setFillStyle(0xffffff, 0.5);              // feedback visual al presionar
-            };
-
-            const release = () => {
-                btn.setFillStyle(0xffffff, 0.25);
-                // Mantiene el botón activo 120 ms más: así un toque rápido también se registra
-                releaseTimer = this.time.delayedCall(120, () => { this.touchState[key] = false; });
-            };
-
-            btn.on('pointerdown', press);
-            btn.on('pointerup', release);
-            btn.on('pointerout', release);
-            btn.on('pointerupoutside', release);
-        };
-
-        // Botones táctiles a los lados (posición según el tamaño del juego)
-        const W = this.scale.width;
-        const y = this.scale.height - 130; // por encima del suelo marino
-        makeButton(60, y, '◀', 'left');
-        makeButton(150, y, '▶', 'right');
-        makeButton(W - 150, y, '▲', 'up');
-        makeButton(W - 60, y, '●', 'fire');
     }
 
     createTempTextures() {
